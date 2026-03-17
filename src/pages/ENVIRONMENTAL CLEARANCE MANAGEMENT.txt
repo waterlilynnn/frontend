@@ -1,0 +1,444 @@
+Sige, nilinis ko based sa comments mo at dinagdagan ng clarifications sa mga tinanong mo. Eto na yung final:
+
+---
+
+# ENVIRONMENTAL CLEARANCE MANAGEMENT SYSTEM
+## FINAL SYSTEM FEATURES
+
+---
+
+## 👥 USER MANAGEMENT & ACCESS CONTROL
+
+### 1. USER ROLES
+
+**Admin**
+- **SAME AS STAFF + ADDITIONAL POWERS:**
+- Can create, edit, disable staff accounts
+- Can view audit logs (who did what)
+- Can perform yearly archiving
+- Can manage system settings/templates
+- Can view all data without restrictions
+
+**Staff**
+- **SAME AS ADMIN EXCEPT:**
+- Cannot manage staff accounts
+- Cannot view audit logs
+- Cannot perform archiving
+- Cannot change system settings
+- Can still do everything else:
+  - Create/edit business records
+  - Process applications (approve/revoke)
+  - Print/reprint clearances
+  - Conduct inspections
+  - View reports (general)
+  - Assign classifications
+  - Email soft copies to owners
+
+### 2. BUSINESS RECORD ACCESS
+- No user account for business owners
+- Business records are managed entirely by CENRO staff/admin
+- Records can be created via:
+  - Single entry form
+  - Bulk import from Excel/CSV
+
+### 3. CLEARANCE RETRIEVAL PROCESS
+- Business owner requests clearance from CENRO
+- Staff searches business by name, owner, or BIN
+- Staff prints clearance and gives hard copy
+- If soft copy requested, staff emails PDF directly to owner
+- No OTP, no online retrieval portal
+
+---
+
+## 📝 BUSINESS RECORD MANAGEMENT
+
+### 4. BUSINESS RECORD FEATURES
+- Add single business record (manual entry)
+- Bulk import from Excel/CSV (for initial data migration)
+- Edit business information
+- Search business by:
+  - Business name
+  - Owner name
+  - BIN number
+- View business history:
+  - Past applications
+  - Clearances issued
+  - Inspection records
+  - Violation history (if applicable)
+
+### 5. BUSINESS INFORMATION FIELDS
+- BIN number (flexible format: Old BPLO BIN (e.g., 129-00…), BICT BIN (e.g., 042119-year), 11 or 13 digits, manual entry, no forced formatting)
+- Establishment name
+- Owner name (structured: last, first, middle (optional), suffix/prefix (optional))
+- Contact details (phone, email)
+- Hauler Type
+- Location (34 barangays dropdown)
+- Has own structure? (Yes/No)
+- Business line (dropdown based on PSIC)
+
+### 6. CLASSIFICATION FIELDS (Staff/Admin Only)
+- Hauler type:
+  - City
+  - Barangay
+  - Accredited
+  - Hazardous
+  - Exempted
+  - No Contract
+- Classification matrix assistance:
+  - System suggests initial classification based on business type
+  - Sari-sari store → Barangay (household)
+  - Hardware → Possible Exempted (if minimal waste)
+  - Water refilling station → Exempted
+  - Clinic → Hazardous (unless verified otherwise)
+  - Final tagging by CENRO staff/admin
+
+---
+
+## 📋 APPLICATION MANAGEMENT
+
+### 7. APPLICATION TYPES
+- **New Application** - First time applicant or no existing record
+- **Renewal** - Automatically detected if business exists in system
+- No manual "Application Type" dropdown needed
+
+### 8. APPLICATION FORM
+Same fields as Business Record plus:
+- Application date (auto-generated)
+- Staff notes field
+
+### 9. APPLICATION STATUS
+- **Pending** - Application under review, waiting for requirements or verification
+- **Approved** - Application approved, clearance can be printed
+- **Revoked** - Clearance revoked due to violation
+- **Re-issued** - New clearance issued after fixing violation (automatic approved status)
+- **Rejected** - Rare, only for major issues
+
+### 10. APPLICATION WORKFLOW
+- Staff creates application for walk-in new applicant and check existing record if renewal
+- Staff reviews information
+- Staff makes corrections if needed (no need to reject)
+- Staff assigns hauler type and classification
+- Staff approves application
+- Admin can also approve directly
+- System logs who approved and when
+
+### 11. DOCUMENT MANAGEMENT
+- **No document upload feature** (physical documents only)
+
+---
+
+## 🎫 CLEARANCE MANAGEMENT
+
+### 12. CONTROL NUMBER GENERATION
+- Format: **EMC-YYYY-MMXXXX**
+  - EMC = Environmental Clearance
+  - YYYY = Year
+  - MM = Month
+  - XXXX = Sequential number
+
+### 13. CLEARANCE CONTENT
+- Business information (name, owner, address, BIN)
+- Control number
+- Validity: Until December 31 of current year
+- Hauler type and classification
+- E-signature of CENRO Signatory
+- QR code for verification
+- Note: *"Please display this clearance in a visible area within the premises."*
+
+### 14. STICKER COLOR CODING
+**Based on hauler type:**
+- **Accredited** - Violet
+- **City** - Yellow
+- **Barangay** - Grayish Blue
+- **Hazardous** - To be determined by CENRO
+- **Exempted** - To be determined by CENRO
+- **No Contract** - To be determined by CENRO
+
+**Template design:**
+- Single base template
+- Year-based color changes only (velum board color changes yearly)
+- Borders may change based on color scheme
+- Logos remain the same
+- Advance application allowed even before January (for next year's clearance)
+
+### 15. CLEARANCE PRINTING
+- A4 size format
+- Color-coded based on hauler type (reflects actual sticker colors)
+- Staff can print approved clearances
+- Hard copy given to business owner
+- Soft copy (PDF) can be emailed upon request
+
+### 16. REPRINT TRACKING
+System records:
+- Number of times clearance was printed
+- Who printed (staff username)
+- Date and time of each print
+- Reason for reprint (if applicable)
+- Printed copy remains valid physically
+- System reflects updated status internally
+- **Admin can view all reprint logs, staff can see their own prints**
+
+### 17. QR CODE VERIFICATION
+- QR code embedded in printed clearance
+- When scanned:
+  - Redirects to verification page
+  - Shows clearance validity
+  - Shows current status (Active/Revoked)
+  - Shows basic business information
+  - Can be used for inspection (autofill or manual search)
+
+---
+
+## 🔍 INSPECTION MODULE
+
+### 18. INSPECTION FEATURES
+- Inspection button per business record
+- QR code scan option for quick lookup
+- Fields to record:
+  - Date of inspection (auto-generated)
+  - Inspector name (logged-in user)
+  - Status: **Passed** or **With Violation**
+  - Remarks field (for notes, violations observed)
+- Past inspections visible in business history
+- Past violations visible during renewal processing
+- Both staff and admin can conduct inspections
+
+### 19. VIOLATION FLAG (Simplified)
+- Basic flag in business record: **Has Violation?** (Yes/No)
+- If Yes, additional fields:
+  - Violation date
+  - Violation details (from remarks)
+  - Status: Pending / Resolved
+- Visible warning in system when viewing business with violation
+- Included in reports (count of businesses with violations)
+
+### 20. REVOCATION TRACKING
+- Option to temporarily revoke clearance
+- Records:
+  - Revocation date
+  - Reason for revocation
+  - Re-issuance date (if applicable)
+- Status reflects as "Revoked" in system
+- Printed clearance in store remains same (no need to retrieve)
+- Statistics track number of revoked and re-issued clearances
+- Both staff and admin can revoke/re-issue
+
+---
+
+## 📊 REPORTING & ANALYTICS
+
+### 21. DASHBOARD STATISTICS
+- Total number of businesses registered
+- Total applications count
+- Total pending applications
+- Total approved applications
+- Total clearances issued
+- Total inspections conducted
+- Total businesses with violations
+- Total revoked clearances
+- Total re-issued clearances
+- Total per structure/building (with lessee/lessor breakdown if applicable)
+
+### 22. REPORTS AND GRAPHS
+
+**Hauler Distribution Graph**
+- Bar chart showing distribution per hauler type
+- Filters available
+
+**Applications per Barangay**
+- Bar chart by location (34 barangays)
+- Shows concentration of businesses
+
+**Top Business Lines**
+- Horizontal bar chart showing most common business types
+
+**Inspection Results**
+- Passed vs. With Violation ratio
+- Trends over time
+
+**Renewal Tracking**
+- Businesses needing renewal (expiring soon)
+- Renewal rate statistics
+
+### 23. REPORT FILTERS
+All reports can be filtered by:
+- Date range (monthly, yearly)
+- Barangay
+- Business line
+- Hauler type
+- Application status
+- Violation status
+
+### 24. AUDIT LOGS (Admin Only)
+- Approval logs (who approved each application)
+- Print logs (who printed each clearance)
+- Reprint logs (count and who)
+- **Staff cannot view audit logs**
+
+---
+
+## 📱 USER INTERFACE
+
+### 25. DESIGN REQUIREMENTS
+- Use our previous color palettes
+
+### 26. ROLE-BASED DASHBOARDS
+
+**Admin Dashboard:**
+- Full statistics overview
+- Management panels for staff accounts
+- Detailed reports access
+- Audit logs section
+- Archiving controls
+- System settings
+
+**Staff Dashboard:**
+- Pending applications
+- Quick search bar
+- Print queue
+- Inspection schedule/tasks
+- Basic reports (no audit logs)
+
+### 27. MOBILE ACCESSIBILITY
+- Can be accessed via phone/tablet browsers
+- Remote approval
+- Can conduct inspections using mobile device
+- Both roles can use mobile version
+
+---
+
+## 🛠️ DATA MANAGEMENT
+
+### 28. EXCEL/CSV IMPORT FUNCTIONALITY
+- Import existing CENRO records for initial data migration
+- Map Excel columns to system fields
+- Bulk create business records
+- Enable automatic renewal detection for next year
+- Option to add single record vs. import multiple
+- **Admin can import, staff can also import (both can)**
+
+### 29. YEARLY ARCHIVING (Admin Only)
+- Automatic archiving of past years' data
+- Clean separation of current and historical records
+- Faster system performance
+- Historical data still accessible for reports (meaning: kapag nag-generate ka ng report, may option ka to include archived data or current data lang. Hindi mo na kailangan i-restore yung archive, viewable pa rin siya sa reports with filter by year)
+- Easy renewal processing for existing businesses
+- **Staff cannot perform archiving**
+
+### 30. DATA VALIDATION
+- Required field checking
+- Format validation where applicable
+- Duplicate entry prevention - business records can have same owner name (since may multiple businesses ang isang owner), pero combination ng establishment name + location dapat unique
+- User-friendly error messages
+
+---
+
+## 🔐 SECURITY FEATURES
+
+### 31. AUTHENTICATION
+- JWT token-based authentication for staff/admin
+- Password hashing with bcrypt
+- Secure login system
+- Password reset functionality (email)
+
+### 32. ACCESS CONTROL
+- Role-based access control (Admin vs Staff)
+- Protected routes based on user roles
+- Admin-only sections (Audit Logs, Staff Management, Archiving, Settings)
+- Session management
+
+### 33. AUDIT TRAIL (System-wide)
+- All approvals logged with user ID and timestamp
+- All prints/reprints logged
+- Inspection records with inspector name
+- Login/logout activities
+- **Only Admin can view audit trail**
+
+---
+
+## 🔔 NOTIFICATION FEATURES
+
+### 34. EMAIL NOTIFICATIONS
+- Optional feature - sent only when needed
+- Types of notifications:
+  - Soft copy of clearance (PDF attached)
+  - Password reset for staff/admin
+- Not required for system to function
+- Staff can send manually if email is available
+- Both staff and admin can send emails
+
+---
+
+## 🔄 WORKFLOW SUMMARIES
+
+### 35. STAFF WORKFLOW (Same as Admin for operations)
+
+**Scenario A: New Walk-in Applicant**
+```
+Applicant arrives at CENRO
+Staff searches if business exists
+If not found → Staff creates new business record
+Staff enters information (applicant provides details)
+Staff reviews requirements (physical documents)
+Staff assigns hauler type and classification
+Staff approves application
+Staff prints clearance
+Staff gives hard copy to applicant
+If requested → Staff emails soft copy PDF
+```
+
+**Scenario B: Renewal**
+```
+Applicant arrives with previous clearance
+Staff searches business in system
+System auto-detects as Renewal
+Staff reviews updated requirements or previous clearance
+Staff checks for past violations
+If no issues → Staff approves
+Staff prints new clearance (updated year)
+Staff gives hard copy
+If requested → Staff emails soft copy PDF
+```
+
+**Scenario C: Inspection**
+```
+Staff goes to establishment
+Opens system on mobile
+Searches business or scan QR code from the clearance
+Clicks "Inspect"
+Selects Passed or With Violation
+Adds remarks
+Submits → Date and inspector auto-recorded
+If With Violation → System flags business
+```
+
+### 36. ADMIN WORKFLOW (Additional Tasks)
+
+**Staff Management:**
+```
+Login
+Go to Staff Management
+Add new staff account (username, password, role)
+Edit staff details if needed
+Disable staff account if staff leaves
+Reset staff password if requested
+```
+
+**Auditing:**
+```
+Login
+Go to Audit Logs
+View who approved what
+View who printed/reprinted
+Filter by date, user, action
+```
+
+**Archiving:**
+```
+Login
+Go to System → Archiving
+Select year to archive
+Confirm archiving
+System moves old data to archive
+Historical data still viewable in reports with year filter
+```
