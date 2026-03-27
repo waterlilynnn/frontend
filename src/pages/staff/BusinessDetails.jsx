@@ -3,22 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import API from '../../config/api';
 import SearchableSelect from '../../components/SearchableSelect';
+import { RequirementsStatusBanner, RequirementsModal } from '../../components/RequirementsSection';
 import { 
-  ArrowLeft,
-  User,
-  MapPin,
-  Edit,
-  Save,
-  X,
-  AlertTriangle,
-  Calendar,
-  Building2,
-  Hash,
-  Phone,
-  Mail,
-  Clock,
-  FileText,
-  Truck
+  ArrowLeft, User, MapPin, Edit, Save, X, AlertTriangle,
+  Calendar, Building2, Hash, Phone, Mail, Clock, FileText,
+  CheckCircle, XCircle, Upload, Eye, Download, ClipboardList
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -27,6 +16,7 @@ const StaffBusinessDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
+  const [showRequirementsModal, setShowRequirementsModal] = useState(false);
   const [formData, setFormData] = useState({});
 
   // Get business details
@@ -72,7 +62,6 @@ const StaffBusinessDetails = () => {
       refetch();
     },
     onError: (error) => {
-      console.error('Update error:', error);
       toast.error(error.response?.data?.detail || 'Update failed');
     },
   });
@@ -98,7 +87,23 @@ const StaffBusinessDetails = () => {
   }, [business]);
 
   const handleSave = () => {
-    updateMutation.mutate(formData);
+    const dataToSave = {
+      establishment_name: formData.establishment_name || business?.establishment_name,
+      business_line: formData.business_line || business?.business_line,
+      bin_number: formData.bin_number || business?.bin_number,
+      owner_last_name: formData.owner_last_name || business?.owner_last_name,
+      owner_first_name: formData.owner_first_name || business?.owner_first_name,
+      owner_middle_name: formData.owner_middle_name || business?.owner_middle_name,
+      owner_suffix: formData.owner_suffix || business?.owner_suffix,
+      contact_number: formData.contact_number || business?.contact_number,
+      email: formData.email || business?.email,
+      location: formData.location || business?.location,
+      hauler_type: formData.hauler_type || business?.hauler_type,
+      application_type: formData.application_type || business?.application_type || 'NEW',
+      has_own_structure: formData.has_own_structure ?? business?.has_own_structure ?? false,
+    };
+    
+    updateMutation.mutate(dataToSave);
   };
 
   const handleInputChange = (field, value) => {
@@ -146,65 +151,75 @@ const StaffBusinessDetails = () => {
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Business Records
         </button>
-        {!isEditing ? (
+        <div className="flex gap-3">
           <button
-            onClick={() => setIsEditing(true)}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            onClick={() => setShowRequirementsModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50"
           >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Record
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Requirements Checklist
           </button>
-        ) : (
-          <div className="flex items-center space-x-2">
+          {!isEditing ? (
             <button
-              onClick={() => {
-                setIsEditing(false);
-                setFormData({
-                  establishment_name: business.establishment_name || '',
-                  business_line: business.business_line || '',
-                  owner_last_name: business.owner_last_name || '',
-                  owner_first_name: business.owner_first_name || '',
-                  owner_middle_name: business.owner_middle_name || '',
-                  owner_suffix: business.owner_suffix || '',
-                  location: business.location || '',
-                  contact_number: business.contact_number || '',
-                  email: business.email || '',
-                  hauler_type: business.hauler_type || '',
-                  application_type: business.application_type || 'NEW',
-                  has_own_structure: business.has_own_structure || false,
-                  bin_number: business.bin_number || '',
-                });
-              }}
+              onClick={() => setIsEditing(true)}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Record
             </button>
-            <button
-              onClick={handleSave}
-              disabled={updateMutation.isLoading}
-              className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {updateMutation.isLoading ? (
-                <>
-                  <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  setIsEditing(false);
+                  setFormData({
+                    establishment_name: business.establishment_name || '',
+                    business_line: business.business_line || '',
+                    owner_last_name: business.owner_last_name || '',
+                    owner_first_name: business.owner_first_name || '',
+                    owner_middle_name: business.owner_middle_name || '',
+                    owner_suffix: business.owner_suffix || '',
+                    location: business.location || '',
+                    contact_number: business.contact_number || '',
+                    email: business.email || '',
+                    hauler_type: business.hauler_type || '',
+                    application_type: business.application_type || 'NEW',
+                    has_own_structure: business.has_own_structure || false,
+                    bin_number: business.bin_number || '',
+                  });
+                }}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={updateMutation.isLoading}
+                className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {updateMutation.isLoading ? (
+                  <>
+                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Requirements Status Banner */}
+      <RequirementsStatusBanner businessId={id} />
 
       {/* Business info card */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         {!isEditing ? (
-          // display mode
+          // DISPLAY MODE
           <>
             <h2 className="text-xl font-bold text-gray-800 mb-4">{business.establishment_name}</h2>
             
@@ -238,26 +253,6 @@ const StaffBusinessDetails = () => {
                 </p>
               </div>
             </div>
-
-            {/* VIOLATIONS SECTION */}
-            {business.has_violation && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-red-800">Violation Recorded</p>
-                    {business.violation_details && (
-                      <p className="text-sm text-red-700 mt-1">{business.violation_details}</p>
-                    )}
-                    {business.violation_date && (
-                      <p className="text-xs text-red-600 mt-1">
-                        Date: {format(new Date(business.violation_date), 'MMM dd, yyyy')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* SECTION 1: BUSINESS INFO */}
             <div className="mt-6 pt-6 border-t border-gray-200">
@@ -313,8 +308,7 @@ const StaffBusinessDetails = () => {
             </div>
           </>
         ) : (
-
-          // edit mode
+          // EDIT MODE - COMPLETE
           <>
             <h2 className="text-xl font-bold text-gray-800 mb-4">Edit Business Record</h2>
             
@@ -408,6 +402,7 @@ const StaffBusinessDetails = () => {
                     value={formData.bin_number || ''}
                     onChange={(e) => handleInputChange('bin_number', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder=""
                   />
                 </div>
               </div>
@@ -502,6 +497,7 @@ const StaffBusinessDetails = () => {
                     value={formData.contact_number || ''}
                     onChange={(e) => handleInputChange('contact_number', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="09171234567"
                   />
                 </div>
                 <div>
@@ -511,6 +507,7 @@ const StaffBusinessDetails = () => {
                     value={formData.email || ''}
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="business@email.com"
                   />
                 </div>
               </div>
@@ -531,6 +528,13 @@ const StaffBusinessDetails = () => {
           </>
         )}
       </div>
+
+      {/* Requirements Modal */}
+      <RequirementsModal
+        businessId={id}
+        isOpen={showRequirementsModal}
+        onClose={() => setShowRequirementsModal(false)}
+      />
     </div>
   );
 };
