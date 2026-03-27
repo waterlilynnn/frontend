@@ -1,47 +1,49 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { 
-  LayoutDashboard, 
-  FileText, 
+import {
+  LayoutDashboard,
+  FileText,
   ClipboardCheck,
   LogOut,
   Users,
-  Shield,
   BarChart3,
   History,
   Building2,
-  Upload  
+  Upload,
+  Settings
 } from 'lucide-react';
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
-
-  const handleLogout = () => {
-    logout();
-  };
+  const navigate = useNavigate();
 
   const navItems = {
     admin: [
-      { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-      { name: 'Staff Management', path: '/admin/staff', icon: Shield },
-      { name: 'Business Records', path: '/admin/business', icon: Building2 },
-      { name: 'Clearances', path: '/admin/clearance', icon: FileText },
-      { name: 'Inspections', path: '/admin/inspections', icon: ClipboardCheck },
-      { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
-      { name: 'Audit Logs', path: '/admin/audit', icon: History },
+      { name: 'Dashboard',        path: '/admin',              icon: LayoutDashboard },
+      { name: 'Staff Management', path: '/admin/staff',        icon: Users },
+      { name: 'Business Records', path: '/admin/business',     icon: Building2 },
+      { name: 'Clearances',       path: '/admin/clearance',    icon: FileText },
+      { name: 'Inspections',      path: '/admin/inspections',  icon: ClipboardCheck },
+      { name: 'Reports',          path: '/admin/reports',      icon: BarChart3 },
+      { name: 'Audit Logs',       path: '/admin/audit',        icon: History },
+      { name: 'Settings',         path: '/admin/settings',     icon: Settings },
     ],
     staff: [
-      { name: 'Dashboard', path: '/staff', icon: LayoutDashboard },
-      { name: 'Business Records', path: '/staff/business', icon: Building2 },
-      { name: 'Clearances', path: '/staff/clearance', icon: FileText },
-      { name: 'Inspections', path: '/staff/inspections', icon: ClipboardCheck },
-      //{ name: 'Test Upload', path: '/staff/bulk-import', icon: Upload },  
-      { name: 'Reports', path: '/staff/reports', icon: BarChart3 },
-    ]
+      { name: 'Dashboard',        path: '/staff',              icon: LayoutDashboard },
+      { name: 'Business Records', path: '/staff/business',     icon: Building2 },
+      { name: 'Clearances',       path: '/staff/clearance',    icon: FileText },
+      { name: 'Inspections',      path: '/staff/inspections',  icon: ClipboardCheck },
+      //{ name: 'Test Upload',    path: '/staff/bulk-import',  icon: Upload }, comment muna ksi hindi talaga need pa
+      { name: 'Reports',          path: '/staff/reports',      icon: BarChart3 },
+    ],
   };
 
-  const currentNavItems = user?.role ? navItems[user.role] || [] : [];
+  const handleLogout = () => {
+    logout(); 
+  };
+
+  const currentNavItems = user?.role ? (navItems[user.role] ?? []) : [];
 
   if (!user) return null;
 
@@ -52,20 +54,19 @@ const Sidebar = () => {
           {currentNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
-            
+
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`
-                  flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200
-                  ${isActive 
-                    ? 'bg-emerald-50 text-emerald-700' 
+                replace // Use replace to prevent back navigation
+                className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
+                  isActive
+                    ? 'bg-emerald-50 text-emerald-700'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }
-                `}
+                }`}
               >
-                <Icon className={`h-5 w-5 ${isActive ? 'text-emerald-600' : 'text-gray-500'}`} />
+                <Icon className={`h-5 w-5 ${isActive ? 'text-emerald-600' : 'text-gray-400'}`} />
                 <span className="text-sm font-medium">{item.name}</span>
               </Link>
             );
@@ -76,10 +77,10 @@ const Sidebar = () => {
       <div className="p-3 border-t border-gray-200">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+          className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
         >
           <LogOut className="h-5 w-5" />
-          <span className="text-sm font-medium">Logout</span>
+          <span className="text-sm font-medium">Sign out</span>
         </button>
       </div>
     </aside>

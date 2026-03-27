@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import API from '../../config/api';
-import { ArrowLeft, Printer, FileText } from 'lucide-react';
+import PDFViewer from '../../components/PDFViewer';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AdminClearanceView = () => {
@@ -11,53 +12,47 @@ const AdminClearanceView = () => {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hasViolation, setHasViolation] = useState(false);
   const [controlNumber, setControlNumber] = useState('');
 
-  // fetch pdf for viewing
+  const { data: clearanceInfo } = useQuery({
+    queryKey: ['clearance', id],
+    queryFn: async () => {
+      const response = await API.get(`/clearance/${id}`);
+      return response.data;
+    },
+  });
+
+  useEffect(() => {
+    if (clearanceInfo) {
+      setHasViolation(clearanceInfo.has_violation || false);
+    }
+  }, [clearanceInfo]);
+
   useEffect(() => {
     const fetchPDF = async () => {
       try {
         setLoading(true);
         const response = await API.post(`/clearance/view/${id}`, null, {
           responseType: 'blob',
-          headers: {
-            'Accept': 'application/pdf',
-          }
         });
-        
-        // get control number from headers
-        const contentDisposition = response.headers['content-disposition'];
-        if (contentDisposition) {
-          const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (match && match[1]) {
-            const filename = match[1].replace(/['"]/g, '');
-            setControlNumber(filename.replace('EMC_CLEARANCE_', '').replace('.pdf', ''));
-          }
-        }
         
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
-        setPdfUrl(url  + "#toolbar=0&view=FitH");
+        setPdfUrl(url);
         setError(null);
       } catch (err) {
-        console.error('Error fetching PDF:', err);
         setError('Failed to load PDF');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPDF();
-
-    return () => {
-      if (pdfUrl) {
-        window.URL.revokeObjectURL(pdfUrl);
-      }
-    };
+    if (id) fetchPDF();
+    return () => { if (pdfUrl) window.URL.revokeObjectURL(pdfUrl); };
   }, [id]);
 
-  // handle print
-  const printMutation = useMutation({
+  const downloadMutation = useMutation({
     mutationFn: async () => {
       const response = await API.post(`/clearance/print/${id}`, null, {
         responseType: 'blob'
@@ -67,12 +62,9 @@ const AdminClearanceView = () => {
     onSuccess: (response) => {
       const contentDisposition = response.headers['content-disposition'];
       let filename = 'clearance.pdf';
-      
       if (contentDisposition) {
         const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match && match[1]) {
-          filename = match[1].replace(/['"]/g, '');
-        }
+        if (match && match[1]) filename = match[1].replace(/['"]/g, '');
       } else if (controlNumber) {
         filename = `${controlNumber}.pdf`;
       }
@@ -85,11 +77,9 @@ const AdminClearanceView = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Clearance downloaded!');
+      toast.success('Downloaded!');
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.detail || 'Failed to print clearance');
-    },
+    onError: () => toast.error('Download failed'),
   });
 
   if (loading) {
@@ -103,47 +93,40 @@ const AdminClearanceView = () => {
   if (error) {
     return (
       <div className="max-w-5xl mx-auto p-6">
-        <button
-          onClick={() => navigate('/admin/clearance')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+        <button onClick={() => navigate('/admin/clearance')} className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </button>
         <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
-          <FileText className="h-16 w-16 text-red-300 mx-auto mb-4" />
+          <AlertTriangle className="h-16 w-16 text-red-300 mx-auto mb-4" />
           <p className="text-red-600">{error}</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="h-screen flex flex-col">
-      {/* minimal header */}
-      <div className="bg-white border-b border-gray-200 py-2 px-4 flex justify-between items-center">
-        <button
-          onClick={() => navigate('/admin/clearance')}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+  if (hasViolation) {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <button onClick={() => navigate('/admin/clearance')} className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </button>
-        <button
-          onClick={() => printMutation.mutate()}
-          disabled={printMutation.isLoading}
-          className="inline-flex items-center px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm disabled:opacity-50"
-        >
-          {printMutation.isLoading ? 'Processing...' : 'Download'}
-        </button>
-      </div>
-
-      {/* pdf viewer */}
-      {pdfUrl && (
-        <div className='bg-white px-11 flex-1 w-full'>
-          <iframe className="flex-1 w-full h-full" src={pdfUrl}>
-          </iframe>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+          <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+          <p className="text-yellow-700 font-medium">Cannot view clearance</p>
+          <p className="text-yellow-600 text-sm mt-2">This business has unresolved violations</p>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen">
+      {pdfUrl && (
+        <PDFViewer
+          url={pdfUrl}
+          onClose={() => navigate('/admin/clearance')}
+          onDownload={() => downloadMutation.mutate()}
+        />
       )}
     </div>
   );

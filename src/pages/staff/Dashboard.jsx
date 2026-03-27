@@ -1,162 +1,259 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import API from '../../config/api';
-import { format } from 'date-fns';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+} from 'recharts';
+
+const ACCENT = {
+  navy:    { border: 'border-l-blue-900',    text: 'text-blue-900'    },
+  emerald: { border: 'border-l-emerald-600', text: 'text-emerald-600' },
+  amber:  { border: 'border-l-amber-500',  text: 'text-amber-500'  },
+  red:     { border: 'border-l-red-600',     text: 'text-red-600'     },
+};
+
+const PALETTE = {
+  lightest: '#cee8cc',
+  light:    '#bfdcba',
+  mid:      '#a0c09e',
+  dark:     '#89ae86',
+  darkest:  '#72986f',
+};
+
+const HAULER_PALETTE = {
+  City:         PALETTE.darkest,
+  Barangay:     PALETTE.dark,
+  Accredited:   PALETTE.mid,
+  Hazardous:    PALETTE.light,
+  Exempted:     PALETTE.lightest,
+  'No Contract':PALETTE.mid,
+};
+
+const PIE_COLORS = [PALETTE.darkest, PALETTE.light];
+
+const BARANGAY_SHADES = [
+  '#72986f','#7ea07b','#89ae86','#94bc91','#a0c09e',
+  '#aac8a7','#b4cfb0','#bfdcba','#c8e2c4','#cee8cc',
+  '#c5e3c3','#bcdeba','#b3d9b1','#a9d3a7','#9fce9e',
+  '#95c894','#8bc28a','#82bc80','#78b677','#6eb06d',
+  '#67a866','#6fb36e','#77be76','#7fc97f','#86d287',
+  '#72986f','#7ea07b','#89ae86','#94bc91','#a0c09e',
+  '#aac8a7','#b4cfb0','#bfdcba','#c8e2c4',
+];
+
+const ChartTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow px-3 py-2 text-sm">
+      <p className="font-semibold text-gray-700">{payload[0]?.payload?.fullName || payload[0]?.payload?.name}</p>
+      <p className="font-medium" style={{ color: PALETTE.darkest }}>{payload[0]?.value}</p>
+    </div>
+  );
+};
 
 const StaffDashboard = () => {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ['staffDashboard'],
+  const { data: allBiz = [],     isLoading: bizLoading   } = useQuery({ queryKey: ['allBizStaffDash'],    queryFn: async () => (await API.get('/business-records/all')).data || []        });
+  const { data: clrHistory = [],  isLoading: clrLoading   } = useQuery({ queryKey: ['allClrStaffDash'],    queryFn: async () => (await API.get('/clearance/history/all')).data || []      });
+  const { data: allInspections = [] } = useQuery({
+    queryKey: ['allInspStaffDash', allBiz.length],
     queryFn: async () => {
-      try {
-        // Get total businesses
-        const businessesRes = await API.get('/business-records/recent?page=1&per_page=1');
-        const totalBusinesses = businessesRes.data.total || 0;
-        
-        // Get all businesses for violations count
-        const allBusinessesRes = await API.get('/business-records/all');
-        const allBusinesses = allBusinessesRes.data || [];
-        const withViolations = allBusinesses.filter(b => b.has_violation).length;
-        
-        // Get clearances
-        const clearancesRes = await API.get('/clearance/history/all');
-        const clearances = clearancesRes.data || [];
-        const totalClearances = clearances.length;
-        
-        // Get businesses without clearance 
-        const pendingClearances = allBusinesses.filter(b => 
-          !clearances.some(c => c.business_record_id === b.id)
-        ).length;
-        
-        // Get recent 5 businesses
-        const recentRes = await API.get('/business-records/recent?page=1&per_page=5');
-        const recentBusinesses = recentRes.data.items || [];
-
-        return {
-          totalBusinesses,
-          withViolations,
-          totalClearances,
-          pendingClearances,
-          recentBusinesses
-        };
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        return {
-          totalBusinesses: 0,
-          withViolations: 0,
-          totalClearances: 0,
-          pendingClearances: 0,
-          recentBusinesses: []
-        };
-      }
+      if (!allBiz.length) return [];
+      const biz = allBiz.slice(0, 300);
+      const results = await Promise.allSettled(biz.map(b => API.get(`/inspections/business/${b.id}`)));
+      return results.flatMap((r, i) =>
+        r.status === 'fulfilled' ? r.value.data.map(insp => ({ ...insp, business_id: biz[i].id })) : []
+      );
     },
+    enabled: allBiz.length > 0,
   });
 
-  const cards = [
-    {
-      title: 'Total Businesses',
-      value: stats?.totalBusinesses || 0,
-      link: '/staff/business'
-    },
-    {
-      title: 'Clearances',
-      value: stats?.totalClearances || 0,
-      link: '/staff/clearance'
-    },
-    {
-      title: 'Pending Clearances',
-      value: stats?.pendingClearances || 0,
-      link: '/staff/clearance'
-    },
-    {
-      title: 'With Violations',
-      value: stats?.withViolations || 0,
-      link: '/staff/inspections'
-    },
+  const isLoading = bizLoading || clrLoading;
+
+  const issuedClearances = clrHistory.filter(c => c.is_claimed);
+  const withViolations   = allBiz.filter(b => b.has_violation);
+
+  const stats = [
+    { label: 'Total Businesses',   value: allBiz.length,           href: '/staff/business',                             accent: 'navy'    },
+    { label: 'Issued Clearances',  value: issuedClearances.length,  href: '/staff/reports?tab=clearances&filter=issued', accent: 'emerald' },
+    { label: 'With Violations',    value: withViolations.length,    href: '/staff/reports?tab=violations',               accent: 'red'     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-      </div>
-    );
-  }
+  const bizLineChartData = useMemo(() => {
+    const map = {};
+    allBiz.forEach(b => { const bl = b.business_line || 'Unknown'; map[bl] = (map[bl] || 0) + 1; });
+    return Object.entries(map)
+      .map(([name, value]) => ({
+        name: name.length > 12 ? name.slice(0, 12) + '…' : name,
+        fullName: name,
+        value,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [allBiz]);
+
+  const haulerChartData = useMemo(() => {
+    const map = {};
+    allBiz.forEach(b => { const h = b.hauler_type || 'Unknown'; map[h] = (map[h] || 0) + 1; });
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value, fill: HAULER_PALETTE[name] || PALETTE.mid }))
+      .sort((a, b) => b.value - a.value);
+  }, [allBiz]);
+
+  const barangayPieData = useMemo(() => {
+    const map = {};
+    allBiz.forEach(b => { const loc = b.location || 'Unknown'; map[loc] = (map[loc] || 0) + 1; });
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [allBiz]);
+
+  const inspPieData = useMemo(() => {
+    const passed   = allInspections.filter(i => i.status === 'PASSED').length;
+    const violated = allInspections.filter(i => i.status === 'WITH VIOLATION').length;
+    if (!passed && !violated) return [];
+    return [{ name: 'Passed', value: passed }, { name: 'With Violation', value: violated }];
+  }, [allInspections]);
+
+  if (isLoading) return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600" />
+    </div>
+  );
+
+  // chart card dimensions
+  const CHART_H = 300;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-12">
       <h1 className="text-2xl font-bold text-gray-800">Staff Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map((card) => (
-          <Link
-            key={card.title}
-            to={card.link}
-            className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow border border-gray-100"
-          >
-            <p className="text-sm text-gray-500 mb-1">{card.title}</p>
-            <p className="text-3xl font-bold text-emerald-700">{card.value}</p>
-          </Link>
-        ))}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-5">
+        {stats.map(({ label, value, href, accent }) => {
+          const { border, text } = ACCENT[accent] ?? ACCENT.emerald;
+          return (
+            <Link key={label} to={href}
+              className={`group bg-white rounded-xl border border-gray-100 border-l-4 ${border} shadow-sm p-5 hover:shadow-md transition-all`}>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{label}</p>
+              <p className={`text-3xl font-bold ${text} group-hover:opacity-80 transition-opacity`}>{value}</p>
+            </Link>
+          );
+        })}
       </div>
 
-      {/* recent businesses */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Recent Businesses</h2>
-          <Link
-            to="/staff/business"
-            className="text-sm text-emerald-600 hover:text-emerald-800"
-          >
-            View All
-          </Link>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            Top Business Lines <span className="text-gray-300 font-normal normal-case">(top 10)</span>
+          </p>
+          {bizLineChartData.length === 0
+            ? <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height: CHART_H }}>No data</div>
+            : (
+              <ResponsiveContainer width="100%" height={CHART_H}>
+                <BarChart data={bizLineChartData} margin={{ top: 4, right: 8, left: -16, bottom: 32 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6B7280' }} angle={-35} textAnchor="end" interval={0} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="value" fill={PALETTE.darkest} radius={[4, 4, 0, 0]}>
+                    {haulerChartData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
         </div>
-        
-        {!stats?.recentBusinesses || stats.recentBusinesses.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No recent businesses</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date Applied</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business Line</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {stats.recentBusinesses.map((business) => (
-                  <tr 
-                    key={business.id} 
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => window.location.href = `/staff/business/${business.id}`}
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Hauler Distribution</p>
+          {haulerChartData.length === 0
+            ? <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height: CHART_H }}>No data</div>
+            : (
+              <ResponsiveContainer width="100%" height={CHART_H}>
+                <BarChart data={haulerChartData} margin={{ top: 4, right: 8, left: -16, bottom: 32 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6B7280' }} angle={-35} textAnchor="end" interval={0} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} allowDecimals={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {haulerChartData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            Applications per Barangay
+            <span className="text-gray-300 font-normal normal-case ml-1">({barangayPieData.length} barangays)</span>
+          </p>
+          {barangayPieData.length === 0
+            ? <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height: CHART_H }}>No data</div>
+            : (
+              <ResponsiveContainer width="100%" height={CHART_H}>
+                <PieChart>
+                  <Pie
+                    data={barangayPieData}
+                    cx="50%" cy="42%"
+                    innerRadius={55}
+                    outerRadius={95}
+                    dataKey="value"
+                    paddingAngle={1}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {business.application_date ? format(new Date(business.application_date), 'MMM dd, yyyy') : '—'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {business.establishment_name}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        BIN: {business.bin_number || '—'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {business.business_line || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {business.owner_name || '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {business.application_type || 'NEW'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    {barangayPieData.map((_, i) => (
+                      <Cell key={i} fill={BARANGAY_SHADES[i % BARANGAY_SHADES.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v, name) => [`${v} businesses`, name]} />
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    wrapperStyle={{ fontSize: 9, color: '#6B7280', paddingTop: 6, maxHeight: 64, overflowY: 'auto' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Inspection Results</p>
+          {inspPieData.length === 0
+            ? <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height: CHART_H }}>No inspection data yet</div>
+            : (
+              <ResponsiveContainer width="100%" height={CHART_H}>
+                <PieChart>
+                  <Pie
+                    data={inspPieData}
+                    cx="50%" cy="42%"
+                    innerRadius={55}
+                    outerRadius={95}
+                    dataKey="value"
+                    paddingAngle={2}
+                  >
+                    {inspPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v, name) => [`${v} inspections`, name]} />
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    wrapperStyle={{ fontSize: 12, color: '#6B7280', paddingTop: 6 }}
+                    formatter={(value, entry) => (
+                      <span style={{ fontSize: 12, color: '#374151' }}>
+                        {value} — {entry.payload.value}
+                      </span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )
+          }
+        </div>
+
       </div>
     </div>
   );

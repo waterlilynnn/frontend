@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import API from '../config/api';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 
@@ -34,7 +35,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error('User not found');
       }
 
-      // Format user data to match expected structure
       const formattedUser = {
         id: userData.id,
         email: userData.email,
@@ -58,9 +58,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Clear storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    
+    // Use replace to prevent going back
+    window.location.href = '/login';
   };
 
   const value = {

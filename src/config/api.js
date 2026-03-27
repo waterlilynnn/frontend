@@ -21,7 +21,10 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Don't redirect on blob requests (PDF viewing)
+    const isBlobRequest = error.config?.responseType === 'blob';
+    
+    if (error.response?.status === 401 && !isBlobRequest) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
