@@ -1,13 +1,12 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import API from '../config/api';
 import {
-  Download, Calendar, ChevronLeft, ChevronRight,
-  AlertTriangle, CheckCircle, Search, X, Printer, ClipboardList,
-  ShieldCheck,
+  Download, ChevronLeft, ChevronRight,
+  AlertTriangle, CheckCircle, Search, X, ShieldCheck,
 } from 'lucide-react';
 
 const fmtDt = (d) => { try { return format(new Date(d), 'MMM dd, yyyy hh:mm a'); } catch { return '—'; } };
@@ -17,22 +16,14 @@ const PER_PAGE = 10;
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 const MONTHS = [
-  { value: 0,  label: 'January'   },
-  { value: 1,  label: 'February'  },
-  { value: 2,  label: 'March'     },
-  { value: 3,  label: 'April'     },
-  { value: 4,  label: 'May'       },
-  { value: 5,  label: 'June'      },
-  { value: 6,  label: 'July'      },
-  { value: 7,  label: 'August'    },
-  { value: 8,  label: 'September' },
-  { value: 9,  label: 'October'   },
-  { value: 10, label: 'November'  },
-  { value: 11, label: 'December'  },
+  { value: 0, label: 'January' }, { value: 1, label: 'February' }, { value: 2, label: 'March' },
+  { value: 3, label: 'April' }, { value: 4, label: 'May' }, { value: 5, label: 'June' },
+  { value: 6, label: 'July' }, { value: 7, label: 'August' }, { value: 8, label: 'September' },
+  { value: 9, label: 'October' }, { value: 10, label: 'November' }, { value: 11, label: 'December' },
 ];
 
 const TABS = [
-  { key: 'clearances',  label: 'Clearances' },
+  { key: 'clearances', label: 'Clearances' },
   { key: 'inspections', label: 'Inspections' },
 ];
 
@@ -63,41 +54,31 @@ const Reports = ({ rolePrefix = 'staff' }) => {
   const initialTab = searchParams.get('tab') || 'clearances';
 
   const now = new Date();
-
-  const [tab, setTab]                           = useState(['clearances', 'inspections'].includes(initialTab) ? initialTab : 'clearances');
-  const [filterMode, setFilterMode]             = useState('monthly');
-  const [selectedMonth, setSelectedMonth]       = useState(now.getMonth());
-  const [selectedYear, setSelectedYear]         = useState(now.getFullYear());
-  const [filterType, setFilterType]             = useState(searchParams.get('filter') || 'all');
+  const [tab, setTab] = useState(['clearances', 'inspections'].includes(initialTab) ? initialTab : 'clearances');
+  const [selYear, setSelYear] = useState(now.getFullYear());
+  const [selMonth, setSelMonth] = useState(now.getMonth());
+  const [filterType, setFilterType] = useState(searchParams.get('filter') || 'all');
   const [filterInspStatus, setFilterInspStatus] = useState('all');
-  const [filterHauler, setFilterHauler]         = useState('all');
-  const [search, setSearch]                     = useState('');
-  const [currentPage, setCurrentPage]           = useState(1);
-  const [pdfLoading, setPdfLoading]             = useState(false);
+  const [filterHauler, setFilterHauler] = useState('all');
+  const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const { dateFrom, dateTo } = useMemo(() => {
-    if (filterMode === 'monthly') {
-      const d = new Date(selectedYear, selectedMonth, 1);
-      return {
-        dateFrom: format(startOfMonth(d), 'yyyy-MM-dd'),
-        dateTo:   format(endOfMonth(d),   'yyyy-MM-dd'),
-      };
-    } else {
-      const d = new Date(selectedYear, 0, 1);
-      return {
-        dateFrom: format(startOfYear(d), 'yyyy-MM-dd'),
-        dateTo:   format(endOfYear(d),   'yyyy-MM-dd'),
-      };
-    }
-  }, [filterMode, selectedMonth, selectedYear]);
+    const d = new Date(selYear, selMonth, 1);
+    return {
+      dateFrom: format(startOfMonth(d), 'yyyy-MM-dd'),
+      dateTo: format(endOfMonth(d), 'yyyy-MM-dd'),
+    };
+  }, [selMonth, selYear]);
 
   const { data: clearances = [], isLoading: clrLoading } = useQuery({
-    queryKey: [`allClr${rolePrefix}Rpt`],
+    queryKey: [`allClr${rolePrefix}Rpt`, selYear, selMonth],
     queryFn: async () => (await API.get('/clearance/history/all')).data || [],
   });
 
   const { data: allInspections = [], isLoading: inspLoading } = useQuery({
-    queryKey: [`allInsp${rolePrefix}Rpt`],
+    queryKey: [`allInsp${rolePrefix}Rpt`, selYear, selMonth],
     queryFn: async () => (await API.get('/inspections/all')).data || [],
   });
 
@@ -111,8 +92,8 @@ const Reports = ({ rolePrefix = 'staff' }) => {
 
   const filteredClr = useMemo(() => clearances.filter(c => {
     if (!inRange(c.printed_at)) return false;
-    if (filterType === 'issued'  && !c.is_claimed) return false;
-    if (filterType === 'pending' &&  c.is_claimed) return false;
+    if (filterType === 'issued' && !c.is_claimed) return false;
+    if (filterType === 'pending' && c.is_claimed) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!c.business_name?.toLowerCase().includes(q) && !c.control_number?.toLowerCase().includes(q)) return false;
@@ -123,9 +104,9 @@ const Reports = ({ rolePrefix = 'staff' }) => {
   const filteredInspections = useMemo(() => {
     const base = allInspections.filter(i => {
       if (!inRange(i.date)) return false;
-      if (filterInspStatus === 'passed'     && i.status !== 'PASSED') return false;
+      if (filterInspStatus === 'passed' && i.status !== 'PASSED') return false;
       if (filterInspStatus === 'unresolved' && !(i.status === 'WITH VIOLATION' && !i.is_resolved)) return false;
-      if (filterInspStatus === 'resolved'   && !(i.status === 'WITH VIOLATION' &&  i.is_resolved)) return false;
+      if (filterInspStatus === 'resolved' && !(i.status === 'WITH VIOLATION' && i.is_resolved)) return false;
       if (filterHauler !== 'all' && i.hauler_type !== filterHauler) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -147,9 +128,9 @@ const Reports = ({ rolePrefix = 'staff' }) => {
     return [...base].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [allInspections, dateFrom, dateTo, filterInspStatus, filterHauler, search]);
 
-  const active     = tab === 'clearances' ? filteredClr : filteredInspections;
+  const active = tab === 'clearances' ? filteredClr : filteredInspections;
   const totalPages = Math.ceil(active.length / PER_PAGE);
-  const paginated  = active.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const paginated = active.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const changeTab = (t) => {
     setTab(t);
@@ -165,7 +146,7 @@ const Reports = ({ rolePrefix = 'staff' }) => {
     try {
       const params = new URLSearchParams();
       params.set('date_from', dateFrom);
-      params.set('date_to',   dateTo);
+      params.set('date_to', dateTo);
       if (search) params.set('search', search);
 
       let endpoint;
@@ -180,10 +161,10 @@ const Reports = ({ rolePrefix = 'staff' }) => {
 
       const response = await API.get(endpoint, { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url  = window.URL.createObjectURL(blob);
-      const a    = document.createElement('a');
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `${tab}_report_${format(new Date(), 'yyyyMMdd')}.pdf`;
+      a.download = `${tab}_report_${selYear}_${MONTHS[selMonth].label}.pdf`;
       a.click();
       window.URL.revokeObjectURL(url);
       toast.success('PDF downloaded!');
@@ -195,10 +176,11 @@ const Reports = ({ rolePrefix = 'staff' }) => {
     }
   };
 
+  const periodLabel = `${MONTHS[selMonth].label} ${selYear}`;
+
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
       <div className="space-y-5">
-
         <div className="flex flex-wrap gap-3 items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
           <button onClick={handleExportPDF} disabled={pdfLoading}
@@ -233,41 +215,23 @@ const Reports = ({ rolePrefix = 'staff' }) => {
           <>
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <div className="flex flex-wrap items-center gap-3">
-
-                {/* Filter mode toggle */}
-                <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden text-sm">
-                  <button
-                    onClick={() => { setFilterMode('monthly'); setCurrentPage(1); }}
-                    className={`px-3 py-1.5 transition-colors ${filterMode === 'monthly' ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
-                    Monthly
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setSelYear(prev => prev - 1); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded">
+                    <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <button
-                    onClick={() => { setFilterMode('yearly'); setCurrentPage(1); }}
-                    className={`px-3 py-1.5 transition-colors ${filterMode === 'yearly' ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
-                    Yearly
+                  <span className="text-sm font-semibold text-gray-800 min-w-[80px] text-center">{selYear}</span>
+                  <button onClick={() => { setSelYear(prev => prev + 1); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded">
+                    <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
 
-                {/* Month picker — only in monthly mode */}
-                {filterMode === 'monthly' && (
-                  <select value={selectedMonth}
-                    onChange={e => { setSelectedMonth(Number(e.target.value)); setCurrentPage(1); }}
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
-                    {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
-                )}
-
-                {/* Year picker */}
-                <select value={selectedYear}
-                  onChange={e => { setSelectedYear(Number(e.target.value)); setCurrentPage(1); }}
+                <select value={selMonth} onChange={e => { setSelMonth(Number(e.target.value)); setCurrentPage(1); }}
                   className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
-                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
 
-                {/* Clearance status */}
                 {tab === 'clearances' && (
-                  <select value={filterType}
-                    onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}
+                  <select value={filterType} onChange={e => { setFilterType(e.target.value); setCurrentPage(1); }}
                     className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
                     <option value="all">All Statuses</option>
                     <option value="issued">Issued</option>
@@ -275,19 +239,16 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                   </select>
                 )}
 
-                {/* Inspection filters */}
                 {tab === 'inspections' && (
                   <>
-                    <select value={filterInspStatus}
-                      onChange={e => { setFilterInspStatus(e.target.value); setCurrentPage(1); }}
+                    <select value={filterInspStatus} onChange={e => { setFilterInspStatus(e.target.value); setCurrentPage(1); }}
                       className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
                       <option value="all">All Results</option>
                       <option value="passed">Passed</option>
                       <option value="unresolved">With Violation</option>
                       <option value="resolved">Resolved</option>
                     </select>
-                    <select value={filterHauler}
-                      onChange={e => { setFilterHauler(e.target.value); setCurrentPage(1); }}
+                    <select value={filterHauler} onChange={e => { setFilterHauler(e.target.value); setCurrentPage(1); }}
                       className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
                       <option value="all">All Haulers</option>
                       {HAULER_TYPES.map(h => <option key={h} value={h}>{h}</option>)}
@@ -295,7 +256,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                   </>
                 )}
 
-                {/* Search */}
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-2 h-4 w-4 text-gray-400" />
                   <input type="text"
@@ -322,7 +282,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                 <div className="text-center py-16">
                   <p className="text-gray-400 text-sm">No records match your filters</p>
                 </div>
-
               ) : tab === 'clearances' ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-100">
@@ -356,7 +315,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                     </tbody>
                   </table>
                 </div>
-
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-100">
@@ -370,11 +328,11 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                     <tbody className="divide-y divide-gray-50">
                       {paginated.map(i => {
                         const isUnresolved = i.status === 'WITH VIOLATION' && !i.is_resolved;
-                        const isResolved   = i.status === 'WITH VIOLATION' &&  i.is_resolved;
+                        const isResolved = i.status === 'WITH VIOLATION' && i.is_resolved;
                         return (
                           <tr key={i.id} className={`transition-colors ${
                             isUnresolved ? 'bg-red-50 hover:bg-red-100'
-                            : isResolved  ? 'hover:bg-blue-50'
+                            : isResolved ? 'hover:bg-blue-50'
                             : 'hover:bg-gray-50'
                           }`}>
                             <td className="px-5 py-3">

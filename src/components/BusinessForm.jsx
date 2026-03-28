@@ -2,6 +2,8 @@ import SearchableSelect from './SearchableSelect';
 import BinNumberInput from './BinNumberInput';
 import RequirementsChecklist from './RequirementsChecklist';
 import { Building2, User, MapPin, ClipboardList } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import API from '../config/api';
 
 const SECTION_HEADER = 'font-medium text-gray-900 mb-4 flex items-center gap-2 text-sm';
 const LABEL = 'block text-sm font-medium text-gray-700 mb-1';
@@ -21,6 +23,14 @@ const BusinessForm = ({
 }) => {
   const { barangays = [], businessLines = [], haulerTypes = [] } = options;
 
+  const { data: businessLinesData } = useQuery({
+    queryKey: ['businessLinesOptions'],
+    queryFn: async () => {
+      const res = await API.get('/admin/settings/business-lines');
+      return res.data.business_lines;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
   return (
     <form onSubmit={onSubmit} className="space-y-0">
       <div className="mb-6">
@@ -85,7 +95,7 @@ const BusinessForm = ({
           <div>
             <label className={LABEL}>Business Line {REQUIRED}</label>
             <SearchableSelect
-              options={businessLines}
+              options={businessLinesData || options?.businessLines || []}
               value={formData.business_line || ''}
               onChange={(value) => onChange('business_line', value)}
               placeholder="Select business line"
