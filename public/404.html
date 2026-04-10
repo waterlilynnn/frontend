@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecting...</title>
+  <script>
+    var path = window.location.pathname;
+    var hash = window.location.hash;
+    window.location.href = '/' + (path !== '/' ? '#' + path : '') + hash;
+  </script>
+</head>
+<body>
+  <p>Redirecting...</p>
+</body>
+</html>
