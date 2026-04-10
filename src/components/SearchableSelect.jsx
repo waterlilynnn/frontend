@@ -48,7 +48,7 @@ const SearchableSelect = ({
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`w-full px-4 py-2 text-left border border-gray-300 rounded-lg bg-white 
-          focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 
+          focus:ring-2 focus:ring-forest-500 focus:border-forest-500 
           ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-gray-50'}
           ${className}`}
         disabled={disabled}
@@ -73,7 +73,7 @@ const SearchableSelect = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-forest-500 focus:border-forest-500"
                 autoFocus
               />
             </div>
@@ -95,8 +95,8 @@ const SearchableSelect = ({
                     setIsOpen(false);
                     setSearchTerm('');
                   }}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-emerald-50 
-                    ${value === option ? 'bg-emerald-100 text-emerald-700' : 'text-gray-700'}`}
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-forest-50 
+                    ${value === option ? 'bg-forest-100 text-emerald-800' : 'text-gray-700'}`}
                 >
                   {option}
                 </button>

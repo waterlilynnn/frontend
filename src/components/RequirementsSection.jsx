@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import API from '../config/api';
 import RequirementsChecklist from './RequirementsChecklist';
-import { ClipboardList, X } from 'lucide-react';
+import { ClipboardList, FileCheck, X } from 'lucide-react';
 
-// Status Banner 
+// Status Banner
 export const RequirementsStatusBanner = ({ businessId }) => {
   const { data } = useQuery({
     queryKey: ['requirements', businessId],
@@ -13,12 +13,28 @@ export const RequirementsStatusBanner = ({ businessId }) => {
 
   if (!data) return null;
 
+  // Exempted business line 
+  if (data.is_exempted) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-forest-400">
+        <div className="flex items-center gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">Requirements Status</h3>
+            <p className="text-xs text-emerald-600 mt-0.5">
+              Exempted — no document submissions required for this business line.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const { submitted, total, hauler_type } = data;
-  const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
+  const pct    = total > 0 ? Math.round((submitted / total) * 100) : 0;
   const allDone = submitted === total && total > 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-emerald-500">
+    <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-forest-500">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-gray-700">Requirements Status</h3>
@@ -29,13 +45,13 @@ export const RequirementsStatusBanner = ({ businessId }) => {
         </div>
         <div className="w-48">
           <div className="flex justify-between text-xs mb-1">
-            <span className={allDone ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
+            <span className={allDone ? 'text-emerald-700 font-medium' : 'text-amber-600 font-medium'}>
               {pct}%
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
             <div
-              className={`h-2.5 rounded-full transition-all duration-500 ${allDone ? 'bg-emerald-500' : 'bg-amber-400'}`}
+              className={`h-2.5 rounded-full transition-all duration-500 ${allDone ? 'bg-forest-500' : 'bg-amber-400'}`}
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -55,7 +71,7 @@ export const RequirementsModal = ({ businessId, isOpen, onClose }) => {
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-emerald-600" />
+              <ClipboardList className="h-5 w-5 text-emerald-700" />
               Requirements Checklist
             </h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -74,7 +90,7 @@ export const RequirementsModal = ({ businessId, isOpen, onClose }) => {
           <div className="flex justify-end pt-6 border-t border-gray-200 mt-6">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
+              className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 text-sm"
             >
               Done
             </button>

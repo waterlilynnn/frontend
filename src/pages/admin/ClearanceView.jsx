@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import API from '../../config/api';
@@ -14,6 +14,7 @@ const AdminClearanceView = () => {
   const [error, setError] = useState(null);
   const [hasViolation, setHasViolation] = useState(false);
   const [controlNumber, setControlNumber] = useState('');
+  const pdfUrlRef = useRef(null);
 
   const { data: clearanceInfo } = useQuery({
     queryKey: ['clearance', id],
@@ -26,30 +27,41 @@ const AdminClearanceView = () => {
   useEffect(() => {
     if (clearanceInfo) {
       setHasViolation(clearanceInfo.has_violation || false);
+      setControlNumber(clearanceInfo.control_number || '');
     }
   }, [clearanceInfo]);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchPDF = async () => {
       try {
         setLoading(true);
         const response = await API.post(`/clearance/view/${id}`, null, {
           responseType: 'blob',
         });
-        
+        if (!mounted) return;
         const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
+        pdfUrlRef.current = url;
         setPdfUrl(url);
         setError(null);
-      } catch (err) {
-        setError('Failed to load PDF');
+      } catch {
+        if (mounted) setError('Failed to load PDF');
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     if (id) fetchPDF();
-    return () => { if (pdfUrl) window.URL.revokeObjectURL(pdfUrl); };
+
+    return () => {
+      mounted = false;
+      if (pdfUrlRef.current) {
+        window.URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
+      }
+    };
   }, [id]);
 
   const downloadMutation = useMutation({
@@ -61,14 +73,11 @@ const AdminClearanceView = () => {
     },
     onSuccess: (response) => {
       const contentDisposition = response.headers['content-disposition'];
-      let filename = 'clearance.pdf';
+      let filename = controlNumber ? `${controlNumber}.pdf` : 'clearance.pdf';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
         if (match && match[1]) filename = match[1].replace(/['"]/g, '');
-      } else if (controlNumber) {
-        filename = `${controlNumber}.pdf`;
       }
-      
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -85,7 +94,7 @@ const AdminClearanceView = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-700"></div>
       </div>
     );
   }
@@ -120,7 +129,7 @@ const AdminClearanceView = () => {
   }
 
   return (
-    <div className="h-screen">
+    <div className="h-screen bg-black">
       {pdfUrl && (
         <PDFViewer
           url={pdfUrl}

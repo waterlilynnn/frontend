@@ -78,8 +78,8 @@ const FileUploader = ({ onFileSelect, onCancel, isLoading }) => {
           className={`
             border-2 border-dashed rounded-lg p-8 text-center
             ${dragActive 
-              ? 'border-emerald-500 bg-emerald-50' 
-              : 'border-gray-300 hover:border-emerald-400'
+              ? 'border-forest-500 bg-forest-50' 
+              : 'border-gray-300 hover:border-forest-400'
             }
             transition-colors cursor-pointer
           `}
@@ -112,7 +112,7 @@ const FileUploader = ({ onFileSelect, onCancel, isLoading }) => {
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <FileText className="h-8 w-8 text-emerald-600" />
+              <FileText className="h-8 w-8 text-emerald-700" />
               <div>
                 <p className="font-medium text-gray-900">{selectedFile.name}</p>
                 <p className="text-sm text-gray-500">
@@ -150,7 +150,7 @@ const FileUploader = ({ onFileSelect, onCancel, isLoading }) => {
           <button
             onClick={handleUpload}
             disabled={isLoading}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center"
+            className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 disabled:opacity-50 flex items-center"
           >
             {isLoading ? (
               <>
