@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, X, AlertTriangle } from 'lucide-react';
 
-const PDFViewer = ({ url, onClose, onDownload, clearanceId }) => {
+const PDFViewer = ({ url, onClose, onDownload }) => {
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -12,7 +12,6 @@ const PDFViewer = ({ url, onClose, onDownload, clearanceId }) => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  // Handle iframe load error
   const handleIframeError = () => {
     setError(true);
   };
@@ -30,7 +29,7 @@ const PDFViewer = ({ url, onClose, onDownload, clearanceId }) => {
             </p>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+              className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800"
             >
               Close
             </button>
@@ -42,26 +41,26 @@ const PDFViewer = ({ url, onClose, onDownload, clearanceId }) => {
 
   return (
     <>
-      <div 
-        className="bg-opacity-85 z-40"
+      <div
+        className="fixed inset-0 bg-black bg-opacity-85 z-40"
         onClick={onClose}
       />
-      
+
       <div className="fixed inset-0 z-50 flex items-center justify-center p-12">
         <div className="relative w-full h-full">
           <iframe
-            src={`${url}#toolbar=0&navpanes=0&scrollbar=0&zoom=53.60`}
+            src={`${url}#toolbar=0&navpanes=0&scrollbar=0&zoom=68`}
             className="w-full h-full bg-transparent"
             style={{ backgroundColor: 'transparent' }}
             title="Clearance Document"
             onError={handleIframeError}
           />
-          
+
           <div className="absolute bottom-8 right-8 flex gap-4">
             {onDownload && (
               <button
                 onClick={onDownload}
-                className="bg-forest-600 hover:bg-forest-700 text-white p-3.5 rounded-full shadow-lg transition-all hover:scale-105"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white p-3.5 rounded-full shadow-lg transition-all hover:scale-105"
                 title="Download PDF"
               >
                 <Download className="h-5 w-5" />

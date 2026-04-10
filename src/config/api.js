@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,9 +21,7 @@ API.interceptors.request.use(
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Don't redirect on blob requests (PDF viewing)
     const isBlobRequest = error.config?.responseType === 'blob';
-    
     if (error.response?.status === 401 && !isBlobRequest) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

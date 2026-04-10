@@ -121,7 +121,7 @@ const ClearanceView = ({ rolePrefix = 'staff' }) => {
   if (pdfLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-3 text-gray-400">
-        <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+        <Loader2 className="h-10 w-10 animate-spin text-emerald-700" />
         <p className="text-sm">Loading clearance…</p>
       </div>
     );
@@ -173,8 +173,8 @@ const ClearanceView = ({ rolePrefix = 'staff' }) => {
           <button
             onClick={() => downloadMutation.mutate()}
             disabled={downloadMutation.isLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white
-                       rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white
+                       rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50 transition-colors"
           >
             {downloadMutation.isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

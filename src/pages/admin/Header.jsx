@@ -15,7 +15,7 @@ const Header = () => {
         <div className="h-full px-6 flex items-center justify-between">
           <div className="flex items-center space-x-8">
             <div className="flex items-center space-x-2">
-              <img src="/cenro-logo.png" alt="CENRO Logo" className="w-28 object-contain"/>
+              <img src="/cenro-logo.png" alt="CENRO Logo" className="w-32 object-contain"/>
             </div>
           </div>
 
@@ -26,8 +26,8 @@ const Header = () => {
                 className="flex items-center space-x-3 py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center space-x-3">
-                  <div className="bg-emerald-100 p-1.5 rounded-full">
-                    <User className="h-5 w-5 text-emerald-700" />
+                  <div className="bg-forest-100 p-1.5 rounded-full">
+                    <User className="h-5 w-5 text-emerald-800" />
                   </div>
                   <div className="text-left hidden md:block">
                     <p className="text-sm font-medium text-gray-800">{user.full_name}</p>
@@ -42,7 +42,7 @@ const Header = () => {
                   <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-sm font-medium text-gray-900">{user.full_name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{user.email}</p>
-                    <span className="inline-block mt-2 px-2 py-1 text-xs bg-emerald-100 text-emerald-800 rounded-full">
+                    <span className="inline-block mt-2 px-2 py-1 text-xs bg-forest-100 text-forest-800 rounded-full">
                       {user.role === 'admin' ? 'Administrator' : 'Staff Member'}
                     </span>
                   </div>
