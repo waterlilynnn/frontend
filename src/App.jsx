@@ -1,4 +1,4 @@
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
@@ -66,7 +66,6 @@ const AppRoutes = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const location = useLocation();
 
-  // Check if user needs to change password (first login or forced)
   useEffect(() => {
     const needsChange = localStorage.getItem('needsPasswordChange');
     if (user && needsChange === 'true' && location.pathname !== '/change-password') {
@@ -129,9 +128,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <HashRouter>
-          <AppRoutes />
-        </HashRouter>
+        <AppRoutes />
       </AuthProvider>
     </QueryClientProvider>
   );
