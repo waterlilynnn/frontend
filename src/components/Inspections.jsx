@@ -424,7 +424,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
 
       {/* Pagination */}
       {!isLoading && totalPages > 1 && (
-        <div className="fixed bottom-4 left-72 right-4 z-10">
+        <div className="fixed bottom-4 left-0 right-0 lg:left-64 z-10 px-4 lg:pr-4 lg:pl-0">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
             <span className="text-sm text-gray-700">
               Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>

@@ -1187,11 +1187,15 @@ const AdminSettings = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-6 overflow-x-auto">
+      <div className="border-b border-gray-200 -mx-4 sm:mx-0 px-4 sm:px-0">
+        <nav className="flex gap-1 sm:gap-6 overflow-x-auto pb-px scrollbar-hide">
           {TABS.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
-              className={`flex items-center gap-2 pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${tab === key ? 'border-emerald-700 text-emerald-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              className={`flex items-center pb-3 text-xs sm:text-sm font-medium border-b-2
+                          transition-colors whitespace-nowrap px-2 sm:px-0 shrink-0
+                          ${tab === key
+                            ? 'border-emerald-700 text-emerald-700'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
               {label}
             </button>
           ))}
