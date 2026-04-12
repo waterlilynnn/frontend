@@ -298,7 +298,7 @@ const InspectionModal = ({ business, isOpen, onClose, onSubmitSuccess }) => {
           {activeSection === 'permits' && (
             <div className="space-y-4">
               <div className="bg-blue-50 p-3 rounded-lg">
-                <p className="text-sm font-medium text-blue-800">DENR / LLDA Permits <span className="text-red-500">— all required</span></p>
+                <p className="text-sm font-medium text-blue-800">DENR / LLDA Permits</p>
               </div>
               {[
                 { key: 'emb_ecc', label: 'EMB-ECC' },
@@ -312,7 +312,7 @@ const InspectionModal = ({ business, isOpen, onClose, onSubmitSuccess }) => {
               ))}
 
               <div className="bg-blue-50 p-3 rounded-lg mt-4">
-                <p className="text-sm font-medium text-blue-800">City Permits <span className="text-red-500">— all required</span></p>
+                <p className="text-sm font-medium text-blue-800">City Permits </p>
               </div>
               {[
                 { key: 'sanitary_permit', label: 'Sanitary Permit' },
@@ -332,7 +332,7 @@ const InspectionModal = ({ business, isOpen, onClose, onSubmitSuccess }) => {
               </FieldRow>
 
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-700 mb-3">Solid Waste Hauling <span className="text-red-500">— all required</span></p>
+                <p className="text-sm font-medium text-gray-700 mb-3">Solid Waste Hauling </p>
                 {SW_HAULING_CATS.map(cat => (
                   <FieldRow key={cat.key} label={cat.label} required error={showValidation && !form.sw_hauling?.[cat.key] ? 'Selection required' : null}>
                     <RadioGroup options={SW_HAULER_OPTS} value={form.sw_hauling?.[cat.key] || null} onChange={v => set('sw_hauling', { ...form.sw_hauling, [cat.key]: v })} hasError={showValidation && !form.sw_hauling?.[cat.key]} />
@@ -440,7 +440,7 @@ const InspectionModal = ({ business, isOpen, onClose, onSubmitSuccess }) => {
             </button>
             <button onClick={handleSubmit} disabled={submitting} className="px-5 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50 flex items-center gap-2">
               {submitting && <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              {submitting ? 'Submitting...' : 'Submit Inspection'}
+              {submitting ? 'Submitting...' : 'Submit'}
             </button>
           </div>
         </div>

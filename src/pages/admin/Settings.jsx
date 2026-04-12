@@ -1188,7 +1188,7 @@ const AdminSettings = () => {
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
       <div className="border-b border-gray-200 -mx-4 sm:mx-0 px-4 sm:px-0">
-        <nav className="flex gap-1 sm:gap-6 overflow-x-auto pb-px scrollbar-hide">
+        <nav className="flex gap-1 sm:gap-6 overflow-x-auto pb-px">
           {TABS.map(({ key, label }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex items-center pb-3 text-xs sm:text-sm font-medium border-b-2
