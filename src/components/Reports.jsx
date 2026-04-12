@@ -4,6 +4,7 @@ import { format, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear } fr
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import API from '../config/api';
+import useIsMobile from '../hooks/useIsMobile';
 import {
   Download, ChevronLeft, ChevronRight,
   AlertTriangle, CheckCircle, Search, X, ShieldCheck,
@@ -38,6 +39,7 @@ const Reports = ({ rolePrefix = 'staff' }) => {
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'clearances';
   const now = new Date();
+  const isMobile = useIsMobile();
 
   const [tab, setTab]                           = useState(['clearances', 'inspections'].includes(initialTab) ? initialTab : 'clearances');
   const [filterMode, setFilterMode]             = useState('monthly');
@@ -96,7 +98,11 @@ const Reports = ({ rolePrefix = 'staff' }) => {
 
   const active     = tab === 'clearances' ? filteredClr : filteredInspections;
   const totalPages = Math.ceil(active.length / PER_PAGE);
-  const paginated  = active.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  // Desktop = paginated slice, Mobile = all
+  const paginated = isMobile
+    ? active
+    : active.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const changeTab = (t) => { setTab(t); setCurrentPage(1); setFilterType('all'); setFilterInspStatus('all'); setSearch(''); setFilterHauler('all'); };
 
@@ -163,12 +169,9 @@ const Reports = ({ rolePrefix = 'staff' }) => {
             {/* Filters */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-
-                {/* Monthly/Yearly toggle */}
                 <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden text-sm">
                   {['monthly', 'yearly'].map(mode => (
-                    <button key={mode}
-                      onClick={() => { setFilterMode(mode); setCurrentPage(1); }}
+                    <button key={mode} onClick={() => { setFilterMode(mode); setCurrentPage(1); }}
                       className={`px-2.5 sm:px-3 py-1.5 capitalize transition-colors ${filterMode === mode ? 'bg-emerald-700 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
                       {mode === 'monthly' ? 'Month' : 'Year'}
                     </button>
@@ -213,7 +216,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                   </>
                 )}
 
-                {/* Search */}
                 <div className="relative flex-1 min-w-[160px]">
                   <Search className="absolute left-3 top-2 h-4 w-4 text-gray-400" />
                   <input type="text" placeholder="Search…" value={search}
@@ -232,7 +234,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                 <div className="text-center py-16"><p className="text-gray-400 text-sm">No records match your filters</p></div>
               ) : tab === 'clearances' ? (
                 <>
-                  {/* Desktop table */}
                   <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-100">
                       <thead className="bg-gray-50">
@@ -259,7 +260,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                       </tbody>
                     </table>
                   </div>
-                  {/* Mobile cards */}
                   <div className="md:hidden divide-y divide-gray-100">
                     {paginated.map(c => (
                       <div key={c.id} className="p-4 space-y-1">
@@ -279,7 +279,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                 </>
               ) : (
                 <>
-                  {/* Desktop table */}
                   <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-100">
                       <thead className="bg-gray-50">
@@ -319,7 +318,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                       </tbody>
                     </table>
                   </div>
-                  {/* Mobile cards */}
                   <div className="md:hidden divide-y divide-gray-100">
                     {paginated.map(i => {
                       const isUnresolved = i.status === 'WITH VIOLATION' && !i.is_resolved;
@@ -345,74 +343,27 @@ const Reports = ({ rolePrefix = 'staff' }) => {
         )}
       </div>
 
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-      <>
-        <div className="hidden lg:block fixed bottom-4 left-64 right-4 z-10">
+      {/* Pagination — desktop only */}
+      {!isMobile && !isLoading && totalPages > 1 && (
+        <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
-            <span className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of{' '}
-              <span className="font-medium">{totalPages}</span>
-              <span className="text-gray-400 ml-2">(records)</span>
-            </span>
+            <p className="text-sm text-gray-600">
+              Page <span className="font-semibold">{currentPage}</span> / <span className="font-semibold">{totalPages}</span>
+              <span className="text-gray-400 ml-2">({active.length} records)</span>
+            </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                <ChevronLeft className="h-4 w-4 mr-1" />Previous
               </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
-                Next <ChevronRight className="h-4 w-4 ml-1" />
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                Next<ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
           </div>
         </div>
-
-        <div className="lg:hidden mt-4 flex items-center justify-between px-1">
-          <span className="text-xs text-gray-500">
-            Page {currentPage} / {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg ${
-                currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </>
-    )}
+      )}
     </div>
   );
 };

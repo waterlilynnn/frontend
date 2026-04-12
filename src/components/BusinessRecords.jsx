@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import API from '../config/api';
 import BusinessForm from './BusinessForm';
+import useIsMobile from '../hooks/useIsMobile';
 import { Search, Plus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const EMPTY_FORM = {
@@ -27,50 +28,27 @@ const PER_PAGE = 10;
 
 const BusinessRecords = ({ rolePrefix = 'staff' }) => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showForm, setShowForm]       = useState(false);
   const [formData, setFormData]       = useState(EMPTY_FORM);
 
-  const isSearchMode = searchQuery.length >= 2;
-
-  const { data: recentData, isLoading: recentLoading, refetch: refetchRecent } = useQuery({
-    queryKey: ['businessRecords', currentPage],
+  // Always fetch all data — pagination for desktop
+  const { data: allBusinesses, isLoading, refetch } = useQuery({
+    queryKey: ['businessRecords', searchQuery],
     queryFn: async () => {
-      const res = await API.get(`/business-records/recent?page=${currentPage}&per_page=${PER_PAGE}`);
-      return res.data;
+      if (searchQuery.length >= 2) {
+        const res = await API.get(
+          `/business-records/search?q=${encodeURIComponent(searchQuery)}&per_page=1000`
+        );
+        return res.data || [];
+      }
+      const res = await API.get('/business-records/all');
+      return res.data || [];
     },
-    enabled: !isSearchMode,
     keepPreviousData: true,
   });
-
-  const { data: searchData, isLoading: searchLoading, refetch: refetchSearch } = useQuery({
-    queryKey: ['businessSearch', searchQuery, currentPage],
-    queryFn: async () => {
-      const res = await API.get(
-        `/business-records/search?q=${encodeURIComponent(searchQuery)}&page=${currentPage}&per_page=${PER_PAGE}`
-      );
-      const items = res.data || [];
-      const first = items[0] || {};
-      return {
-        items,
-        total:       first._total       ?? items.length,
-        page:        first._page        ?? currentPage,
-        per_page:    first._per_page    ?? PER_PAGE,
-        total_pages: first._total_pages ?? Math.ceil(items.length / PER_PAGE),
-      };
-    },
-    enabled: isSearchMode,
-    keepPreviousData: true,
-  });
-
-  const isLoading = isSearchMode ? searchLoading : recentLoading;
-  const pageData  = isSearchMode ? searchData : recentData;
-  const refetch   = isSearchMode ? refetchSearch : refetchRecent;
-
-  const businesses = pageData?.items      || [];
-  const totalPages = pageData?.total_pages ?? 0;
-  const totalCount = pageData?.total       ?? 0;
 
   const { data: options } = useQuery({
     queryKey: ['options'],
@@ -101,7 +79,16 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to create record'),
   });
 
-  const handleSubmit    = (e) => { e.preventDefault(); createMutation.mutate(formData); };
+  const allItems   = allBusinesses || [];
+  const totalCount = allItems.length;
+  const totalPages = Math.ceil(totalCount / PER_PAGE);
+
+  // Desktop = paginated slice, Mobile = all
+  const businesses = isMobile
+    ? allItems
+    : allItems.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const handleSubmit      = (e) => { e.preventDefault(); createMutation.mutate(formData); };
   const handleFieldChange = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
   const handleSearchChange = (value) => { setSearchQuery(value); setCurrentPage(1); };
 
@@ -166,7 +153,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
           )}
         </div>
 
-        {isSearchMode && !isLoading && (
+        {searchQuery.length >= 2 && !isLoading && (
           <p className="text-xs text-gray-500">
             <span className="bg-gray-100 px-2 py-0.5 rounded-full font-medium">
               {totalCount} result{totalCount !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
@@ -206,7 +193,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
             </div>
           ) : businesses.length === 0 ? (
             <div className="text-center py-12 text-gray-500 text-sm">
-              {isSearchMode ? `No results found for "${searchQuery}"` : 'No business records found'}
+              {searchQuery.length >= 2 ? `No results found for "${searchQuery}"` : 'No business records found'}
             </div>
           ) : (
             <>
@@ -281,35 +268,29 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
         </div>
       </div>
 
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-      <>
-        <div className="hidden lg:block fixed bottom-4 left-64 right-4 z-10">
+      {/* Pagination — desktop only */}
+      {!isMobile && !isLoading && totalPages > 1 && (
+        <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
             <span className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of{' '}
-              <span className="font-medium">{totalPages}</span>
-              <span className="text-gray-400 ml-2">(records)</span>
+              Page <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span>
+              <span className="text-gray-400 ml-2">({totalCount} records)</span>
             </span>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
                 className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                  currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'
                 }`}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Previous
               </button>
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
                 className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                  currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'
                 }`}
               >
                 Next <ChevronRight className="h-4 w-4 ml-1" />
@@ -317,38 +298,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
             </div>
           </div>
         </div>
-
-        <div className="lg:hidden mt-4 flex items-center justify-between px-1">
-          <span className="text-xs text-gray-500">
-            Page {currentPage} / {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg ${
-                currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </>
-    )}
+      )}
     </div>
   );
 };

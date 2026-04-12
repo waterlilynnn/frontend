@@ -3,36 +3,42 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import API from '../../config/api';
+import useIsMobile from '../../hooks/useIsMobile';
 import { Search, Plus, ChevronLeft, ChevronRight, X, Shield } from 'lucide-react';
 
+const PER_PAGE = 10;
+
 const StaffManagement = () => {
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ full_name: '', email: '' });
   const [creating, setCreating] = useState(false);
 
-  const { data: staff, isLoading, refetch } = useQuery({
-    queryKey: ['staffList', searchQuery, currentPage],
+  const { data: allStaff = [], isLoading, refetch } = useQuery({
+    queryKey: ['staffList'],
     queryFn: async () => {
       const response = await API.get('/admin/staff');
-      let data = response.data || [];
-      if (searchQuery && searchQuery.length >= 2) {
-        const query = searchQuery.toLowerCase();
-        data = data.filter(s =>
-          s.full_name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query)
-        );
-      }
-      const start = (currentPage - 1) * 10;
-      return {
-        items:       data.slice(start, start + 10),
-        total:       data.length,
-        page:        currentPage,
-        per_page:    10,
-        total_pages: Math.ceil(data.length / 10),
-      };
+      return response.data || [];
     },
   });
+
+  // Client-side filter
+  const filtered = searchQuery.length >= 2
+    ? allStaff.filter(s => {
+        const q = searchQuery.toLowerCase();
+        return s.full_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+      })
+    : allStaff;
+
+  const totalCount = filtered.length;
+  const totalPages = Math.ceil(totalCount / PER_PAGE);
+
+  // Desktop = paginated slice, Mobile = all
+  const items = isMobile
+    ? filtered
+    : filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const createStaff = useMutation({
     mutationFn: async (staffData) => (await API.post('/admin/staff', staffData)).data,
@@ -58,10 +64,6 @@ const StaffManagement = () => {
     await createStaff.mutateAsync(newStaff);
     setCreating(false);
   };
-
-  const items      = staff?.items      || [];
-  const totalPages = staff?.total_pages || 1;
-  const totalRecords = staff?.total    || 0;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-700" /></div>;
@@ -91,9 +93,9 @@ const StaffManagement = () => {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total Staff', value: totalRecords },
-            { label: 'Active',      value: items.filter(s => s.is_active).length },
-            { label: 'Inactive',    value: items.filter(s => !s.is_active).length },
+            { label: 'Total Staff', value: allStaff.length },
+            { label: 'Active',      value: allStaff.filter(s => s.is_active).length },
+            { label: 'Inactive',    value: allStaff.filter(s => !s.is_active).length },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white rounded-lg shadow-sm p-3 sm:p-4 border border-gray-100">
               <p className="text-xs sm:text-sm text-gray-500">{label}</p>
@@ -171,73 +173,26 @@ const StaffManagement = () => {
         </div>
       </div>
 
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-        <>
-          <div className="hidden lg:block fixed bottom-4 left-64 right-4 z-10">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
-              <span className="text-sm text-gray-700">
-                Page <span className="font-medium">{currentPage}</span> of{' '}
-                <span className="font-medium">{totalPages}</span>
-                <span className="text-gray-400 ml-2">(records)</span>
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                    currentPage === 1
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                  }`}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                    currentPage === totalPages
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                  }`}
-                >
-                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:hidden mt-4 flex items-center justify-between px-1">
-            <span className="text-xs text-gray-500">
-              Page {currentPage} / {totalPages}
+      {/* Pagination — desktop only */}
+      {!isMobile && totalPages > 1 && (
+        <div className="fixed bottom-4 left-64 right-4 z-10">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
+            <span className="text-sm text-gray-700">
+              Page <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span>
+              <span className="text-gray-400 ml-2">({totalCount} staff)</span>
             </span>
             <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`p-2 rounded-lg ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
-                <ChevronLeft className="h-4 w-4" />
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                <ChevronLeft className="h-4 w-4 mr-1" />Previous
               </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`p-2 rounded-lg ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
-                <ChevronRight className="h-4 w-4" />
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                Next<ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Create staff modal */}

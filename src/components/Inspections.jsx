@@ -4,10 +4,11 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import toast from 'react-hot-toast';
 import API from '../config/api';
 import InspectionModal from './InspectionModal';
+import useIsMobile from '../hooks/useIsMobile';
 import {
   Search, CheckCircle, AlertCircle, MinusCircle, X,
   ChevronLeft, ChevronRight, Clock, User, Calendar,
-  ClipboardList, Shield, Filter, ShieldCheck, AlertTriangle,
+  Shield, Filter, ShieldCheck,
 } from 'lucide-react';
 
 const MONTHS = [
@@ -103,38 +104,29 @@ const HistorySlideOver = ({ business, onClose }) => {
                       ? <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Resolved</span>
                       : <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Passed</span>}
                   </div>
-
                   <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
                     <User className="h-3 w-3" /> {insp.inspector || 'Unknown'}
                   </div>
-
                   {insp.remarks && (
                     <p className="text-sm text-gray-700 mt-2 bg-white/60 rounded p-2">{insp.remarks}</p>
                   )}
-
                   {isResolved && (
                     <div className="mt-2 text-xs text-blue-700">
                       <span className="font-medium">Resolved by:</span> {insp.resolved_by} · {fmtDt(insp.resolved_at)}
                       {insp.resolved_remarks && <p className="mt-0.5">Remark: {insp.resolved_remarks}</p>}
                     </div>
                   )}
-
                   {isViolation && !isResolved && (
                     <div className="mt-3">
                       {resolveId === insp.id ? (
                         <div className="space-y-2">
-                          <textarea
-                            rows={2}
-                            placeholder="Resolution remarks (optional)"
-                            value={resolveRemarks}
-                            onChange={e => setResolveRemarks(e.target.value)}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
-                          />
+                          <textarea rows={2} placeholder="Resolution remarks (optional)"
+                            value={resolveRemarks} onChange={e => setResolveRemarks(e.target.value)}
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm" />
                           <div className="flex gap-2">
                             <button onClick={() => { setResolveId(null); setResolveRemarks(''); }}
                               className="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600">Cancel</button>
-                            <button
-                              onClick={() => resolveMutation.mutate({ id: insp.id, remarks: resolveRemarks })}
+                            <button onClick={() => resolveMutation.mutate({ id: insp.id, remarks: resolveRemarks })}
                               disabled={resolveMutation.isLoading}
                               className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50">
                               Confirm
@@ -161,6 +153,7 @@ const HistorySlideOver = ({ business, onClose }) => {
 
 const Inspections = ({ rolePrefix = 'staff' }) => {
   const qc = useQueryClient();
+  const isMobile = useIsMobile();
 
   const now = new Date();
   const [selYear, setSelYear]             = useState(now.getFullYear());
@@ -246,7 +239,11 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
 
   const PER_PAGE   = 10;
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
-  const paginated  = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  // Desktop = paginated slice, Mobile = all
+  const paginated = isMobile
+    ? filtered
+    : filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const handleInspectDone = () => {
     qc.invalidateQueries(['allInspections']);
@@ -263,32 +260,17 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
   const checkCanInspect = async (businessId, businessData) => {
     try {
       const res = await API.get(`/inspections/business/${businessId}/can-inspect`);
-
-      if (res.data.can_inspect) {
-        setInspectBusiness(businessData);
-        return;
-      }
-
-      if (res.data.reason === 'exempted') {
-        toast.error('This business line is exempted from inspections');
-        return;
-      }
-
-      const maxCount    = res.data.max_count;  
-      const period      = res.data.period;
-      const lastRaw     = res.data.last_inspection_date;
-      const lastFormatted = lastRaw
-        ? format(new Date(lastRaw), 'MMMM dd, yyyy')
-        : null;
-
+      if (res.data.can_inspect) { setInspectBusiness(businessData); return; }
+      if (res.data.reason === 'exempted') { toast.error('This business line is exempted from inspections'); return; }
+      const maxCount      = res.data.max_count;
+      const period        = res.data.period;
+      const lastRaw       = res.data.last_inspection_date;
+      const lastFormatted = lastRaw ? format(new Date(lastRaw), 'MMMM dd, yyyy') : null;
       const msg = lastFormatted
         ? `This business was already inspected on ${lastFormatted}. Maximum of ${maxCount} inspection(s) per ${period} reached.`
         : `Maximum ${maxCount} inspection(s) per ${period} reached.`;
-
       toast.error(msg);
-    } catch {
-      toast.error('Failed to check inspection eligibility');
-    }
+    } catch { toast.error('Failed to check inspection eligibility'); }
   };
 
   return (
@@ -422,74 +404,27 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
         </div>
       </div>
 
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-      <>
-        <div className="hidden lg:block fixed bottom-4 left-64 right-4 z-10">
+      {/* Pagination — desktop only */}
+      {!isMobile && !isLoading && totalPages > 1 && (
+        <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
             <span className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of{' '}
-              <span className="font-medium">{totalPages}</span>
-              <span className="text-gray-400 ml-2">(records)</span>
+              Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
+              <span className="text-gray-400 ml-2">({filtered.length} records)</span>
             </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+            <div className="flex gap-3">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                <ChevronLeft className="h-4 w-4 mr-1" />Previous
               </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
-                Next <ChevronRight className="h-4 w-4 ml-1" />
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
+                Next<ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
           </div>
         </div>
-
-        <div className="lg:hidden mt-4 flex items-center justify-between px-1">
-          <span className="text-xs text-gray-500">
-            Page {currentPage} / {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg ${
-                currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </>
-    )}
+      )}
     </div>
   );
 };

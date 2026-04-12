@@ -5,10 +5,13 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import API from '../config/api';
 import PDFViewer from './PDFViewer';
+import useIsMobile from '../hooks/useIsMobile';
 import {
   FileText, Search, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, AlertTriangle, X, ClipboardList,
 } from 'lucide-react';
+
+const PER_PAGE = 10;
 
 const formatDateTime = (dateString) => {
   if (!dateString) return '—';
@@ -26,6 +29,7 @@ const extractErrorMsg = (error) => {
 
 const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery]               = useState('');
   const [currentPage, setCurrentPage]               = useState(1);
   const [showGenerateModal, setShowGenerateModal]   = useState(false);
@@ -38,20 +42,23 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
   const [viewingControlNumber, setViewingControlNumber] = useState('');
   const [generateError, setGenerateError]           = useState('');
 
+  // Fetch all businesses + clearances — pagination for desktop
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['clearanceBusinesses', searchQuery, currentPage],
+    queryKey: ['clearanceBusinesses', searchQuery],
     queryFn: async () => {
-      let businessesRes;
+      let businesses;
       if (searchQuery && searchQuery.length >= 2) {
-        const searchRes = await API.get(`/business-records/search?q=${searchQuery}`);
-        businessesRes = { data: { items: searchRes.data, total: searchRes.data.length, page: 1, per_page: 10, total_pages: Math.ceil(searchRes.data.length / 10) } };
+        const res = await API.get(`/business-records/search?q=${searchQuery}&per_page=1000`);
+        businesses = res.data || [];
       } else {
-        businessesRes = await API.get(`/business-records/recent?page=${currentPage}&per_page=10`);
+        const res = await API.get('/business-records/all');
+        businesses = res.data || [];
       }
-      const approvedBusinesses = businessesRes.data.items || [];
-      const clearancesRes      = await API.get('/clearance/history/all');
-      const clearances         = clearancesRes.data || [];
-      const items = approvedBusinesses.map((business) => {
+
+      const clearancesRes = await API.get('/clearance/history/all');
+      const clearances    = clearancesRes.data || [];
+
+      const items = businesses.map((business) => {
         const clearance = clearances.find((c) => c.business_record_id === business.id);
         return {
           id:               business.id,
@@ -70,7 +77,8 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
           has_clearance:    !!clearance,
         };
       });
-      return { items, total: businessesRes.data.total || items.length, page: businessesRes.data.page || currentPage, per_page: businessesRes.data.per_page || 10, total_pages: businessesRes.data.total_pages || Math.ceil(items.length / 10) };
+
+      return { items, total: items.length };
     },
   });
 
@@ -137,8 +145,14 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
 
   const closeGenerateModal = () => { setShowGenerateModal(false); setSelectedBusiness(null); setGenerateError(''); };
 
-  const items      = data?.items      || [];
-  const totalPages = data?.total_pages || 1;
+  const allItems   = data?.items || [];
+  const totalCount = allItems.length;
+  const totalPages = Math.ceil(totalCount / PER_PAGE);
+
+  // Desktop = paginated slice, Mobile = all
+  const items = isMobile
+    ? allItems
+    : allItems.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const StatusChip = ({ item }) => {
     if (item.is_claimed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><CheckCircle className="h-3 w-3" />Issued</span>;
@@ -172,7 +186,7 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Modals */}
+      {/* Generate modal */}
       {showGenerateModal && selectedBusiness && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
@@ -342,74 +356,27 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
         </div>
       </div>
 
-      {/* Pagination */}
-      {!isLoading && totalPages > 1 && (
-      <>
-        <div className="hidden lg:block fixed bottom-4 left-64 right-4 z-10">
+      {/* Pagination — desktop only */}
+      {!isMobile && totalPages > 1 && (
+        <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
             <span className="text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> of{' '}
-              <span className="font-medium">{totalPages}</span>
-              <span className="text-gray-400 ml-2">(records)</span>
+              Page <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span>
+              <span className="text-gray-400 ml-2">({totalCount} records)</span>
             </span>
             <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
+              <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Previous
               </button>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
+              <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
           </div>
         </div>
-
-        <div className="lg:hidden mt-4 flex items-center justify-between px-1">
-          <span className="text-xs text-gray-500">
-            Page {currentPage} / {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg ${
-                currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg ${
-                currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
-              }`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </>
-    )}
+      )}
     </div>
   );
 };
