@@ -1,162 +1,278 @@
-import { useEffect, useState } from 'react';
-import { Download, X, AlertTriangle, ExternalLink } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Download, X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, FileText } from 'lucide-react';
 
-const PDFViewer = ({ url, onClose, onDownload }) => {
-  const [error, setError]       = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+const PDFJS_CDN  = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+const injectTextLayerCSS = () => {
+  if (document.getElementById('pdfjs-text-layer-style')) return;
+  const style = document.createElement('style');
+  style.id = 'pdfjs-text-layer-style';
+  style.textContent = `
+    .pdf-text-layer {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      line-height: 1;
+      pointer-events: auto;
+    }
+    .pdf-text-layer span {
+      color: transparent;
+      position: absolute;
+      white-space: pre;
+      cursor: text;
+      transform-origin: 0% 0%;
+    }
+    .pdf-text-layer span::selection {
+      background: rgba(37, 99, 235, 0.35);
+      color: transparent;
+    }
+    .pdf-text-layer span::-moz-selection {
+      background: rgba(37, 99, 235, 0.35);
+      color: transparent;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
+const loadPdfJs = () =>
+  new Promise((resolve, reject) => {
+    if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
+    const script = document.createElement('script');
+    script.src = PDFJS_CDN;
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_CDN;
+      resolve(window.pdfjsLib);
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+/**
+ * PDFViewer
+ * Props:
+ *  url        – blob URL of the PDF
+ *  title      – shown in toolbar (e.g. control number or filename)
+ *  onClose    – called when viewer is dismissed
+ *  onDownload – called when Download button is clicked
+ */
+const PDFViewer = ({ url, title, onClose, onDownload }) => {
+  const [pdfDoc, setPdfDoc]           = useState(null);
+  const [numPages, setNumPages]       = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [scale, setScale]             = useState(() => window.innerWidth < 768 ? 0.65 : 1.3);
+  const [loading, setLoading]         = useState(true);
+  const [rendering, setRendering]     = useState(false);
+  const [error, setError]             = useState(false);
+
+  const canvasRef     = useRef(null);
+  const textLayerRef  = useRef(null);
+  const renderTaskRef = useRef(null);
+
+  // Load PDF.js + open document
   useEffect(() => {
-    // Detect mobile
-    const mobile =
-      /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
-      window.innerWidth < 768;
-    setIsMobile(mobile);
-  }, []);
+    injectTextLayerCSS();
+    let cancelled = false;
+    (async () => {
+      try {
+        const lib = await loadPdfJs();
+        const doc = await lib.getDocument(url).promise;
+        if (!cancelled) { setPdfDoc(doc); setNumPages(doc.numPages); setLoading(false); }
+      } catch {
+        if (!cancelled) { setError(true); setLoading(false); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [url]);
 
+  // Render canvas + text layer
+  const renderPage = useCallback(async () => {
+    if (!pdfDoc || !canvasRef.current || !textLayerRef.current) return;
+    if (renderTaskRef.current) { renderTaskRef.current.cancel(); renderTaskRef.current = null; }
+    setRendering(true);
+    try {
+      const page    = await pdfDoc.getPage(currentPage);
+      const canvas  = canvasRef.current;
+      const textDiv = textLayerRef.current;
+      if (!canvas || !textDiv) return;
+
+      const viewport = page.getViewport({ scale });
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      textDiv.style.width  = `${viewport.width}px`;
+      textDiv.style.height = `${viewport.height}px`;
+      textDiv.innerHTML    = '';
+
+      const task = page.render({ canvasContext: canvas.getContext('2d'), viewport });
+      renderTaskRef.current = task;
+      await task.promise;
+
+      const textContent = await page.getTextContent();
+      window.pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        container: textDiv,
+        viewport,
+        textDivs: [],
+      });
+    } catch (e) {
+      if (e?.name !== 'RenderingCancelledException') console.error(e);
+    } finally {
+      setRendering(false);
+    }
+  }, [pdfDoc, currentPage, scale]);
+
+  useEffect(() => { renderPage(); }, [renderPage]);
+
+  // ESC key
   useEffect(() => {
-    const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
   }, [onClose]);
 
-  // MOBILE VIEW 
-  if (isMobile) {
-    return (
-      <>
-        <div className="fixed inset-0 bg-black/70 z-40" onClick={onClose} />
+  const goTo = (p) => setCurrentPage(Math.min(numPages, Math.max(1, p)));
+  const zoom = (d) => setScale((s) => Math.min(3, Math.max(0.4, parseFloat((s + d).toFixed(2)))));
 
-        {/* Bottom sheet on mobile */}
-        <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-1" />
+  const touchStart = useRef(null);
+  const onTouchStart = (e) => { touchStart.current = e.touches[0].clientX; };
+  const onTouchEnd   = (e) => {
+    if (touchStart.current === null || numPages <= 1) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current;
+    if (Math.abs(dx) > 55) dx < 0 ? goTo(currentPage + 1) : goTo(currentPage - 1);
+    touchStart.current = null;
+  };
 
-          <div className="px-6 pt-3 pb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-gray-900">View Clearance</h3>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+  const multiPage = numPages > 1;
 
-            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-              PDF viewing is not available on mobile browsers. You can open it
-              in your browser's built-in viewer, or download it directly to your device.
-            </p>
-
-            <div className="space-y-3">
-              {/* Open in browser tab */}
-              
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3.5 bg-emerald-700
-                           text-white rounded-xl text-sm font-medium hover:bg-emerald-800
-                           active:bg-emerald-900 transition-colors"
-              <a>
-                <ExternalLink className="h-4 w-4" />
-                Open in Browser
-              </a>
-
-              {onDownload && (
-                <button
-                  onClick={() => { onDownload(); onClose(); }}
-                  className="flex items-center justify-center gap-2 w-full py-3.5
-                             border-2 border-emerald-700 text-emerald-700 rounded-xl
-                             text-sm font-medium hover:bg-emerald-50 active:bg-emerald-100
-                             transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Download PDF
-                </button>
-              )}
-
-              <button
-                onClick={onClose}
-                className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl
-                           text-sm hover:bg-gray-50 active:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ERROR STATE 
-  if (error) {
-    return (
-      <>
-        <div className="fixed inset-0 bg-black/85 z-40" onClick={onClose} />
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-8 max-w-sm w-full text-center shadow-xl">
-            <AlertTriangle className="h-14 w-14 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Cannot Load PDF</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              The clearance document could not be loaded. Try downloading it instead.
-            </p>
-            <div className="flex gap-3 justify-center">
-              {onDownload && (
-                <button
-                  onClick={() => { onDownload(); onClose(); }}
-                  className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm
-                             hover:bg-emerald-800 flex items-center gap-1"
-                >
-                  <Download className="h-4 w-4" />Download
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm
-                           text-gray-700 hover:bg-gray-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // DESKTOP IFRAME VIEW 
   return (
     <>
-      <div className="fixed inset-0 bg-black/85 z-40" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-6 sm:p-12">
-        <div className="relative w-full h-full">
-          <iframe
-            src={`${url}#toolbar=0&navpanes=0&scrollbar=0&zoom=53.60`}
-            className="w-full h-full"
-            style={{ backgroundColor: 'transparent' }}
-            title="Clearance Document"
-            onError={() => setError(true)}
-          />
+      {/* Blurry transparent backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
-          <div className="absolute bottom-4 sm:bottom-8 right-4 sm:right-8 flex gap-3">
+      <div
+        className="fixed inset-0 z-50 flex flex-col"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Toolbar */}
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5
+                        bg-green-900/80 backdrop-blur-md text-white shrink-0 select-none
+                        border-b border-white/10">
+
+          {/* Left: page nav */}
+          <div className="flex items-center gap-2 min-w-0">
+            {multiPage ? (
+              <>
+                <button onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1}
+                  className="p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-30 transition-colors shrink-0">
+                  <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+                <span className="text-xs sm:text-sm font-medium tabular-nums whitespace-nowrap">
+                  {loading ? '—' : `${currentPage} / ${numPages}`}
+                </span>
+                <button onClick={() => goTo(currentPage + 1)} disabled={currentPage >= numPages || loading}
+                  className="p-1.5 rounded-lg hover:bg-white/10 disabled:opacity-30 transition-colors shrink-0">
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              </>
+            ) : (
+              /* Single-page: show filename / control number instead */
+              title && (
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-200 truncate max-w-[180px] sm:max-w-xs">
+                    {title}
+                  </span>
+                </div>
+              )
+            )}
+          </div>
+
+          {/* Right: zoom + download + close */}
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <button onClick={() => zoom(-0.1)}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+              <ZoomOut className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+            <span className="text-xs font-mono text-gray-300 w-10 text-center">
+              {Math.round(scale * 100)}%
+            </span>
+            <button onClick={() => zoom(0.1)}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+              <ZoomIn className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+
             {onDownload && (
-              <button
-                onClick={onDownload}
-                title="Download PDF"
-                className="bg-emerald-700 hover:bg-emerald-800 text-white p-3 sm:p-3.5
-                           rounded-full shadow-lg transition-all hover:scale-105"
-              >
-                <Download className="h-4 w-4 sm:h-5 sm:w-5" />
+              <button onClick={onDownload}
+                className="flex items-center gap-1.5 ml-1 sm:ml-2 px-3 py-1.5
+                           border border-white hover:bg-white/10 text-xs sm:text-sm
+                           font-medium rounded-lg transition-colors">
+                <span className="hidden sm:inline">Download</span>
               </button>
             )}
-            <button
-              onClick={onClose}
-              title="Close (ESC)"
-              className="bg-red-600 hover:bg-red-700 text-white p-3 sm:p-3.5
-                         rounded-full shadow-lg transition-all hover:scale-105"
-            >
+
+            <button onClick={onClose}
+              className="p-1.5 ml-1 rounded-lg hover:bg-white/10 transition-colors">
               <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           </div>
         </div>
+
+        {/* PDF canvas area */}
+        <div className="flex-1 overflow-auto flex items-start justify-center p-3 sm:p-8">
+
+          {loading && (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-white">
+              <Loader2 className="h-10 w-10 animate-spin text-emerald-400" />
+              <p className="text-sm text-gray-300">Loading document…</p>
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-white px-6 text-center">
+              <X className="h-12 w-12 text-red-400" />
+              <p className="font-semibold">Failed to load PDF</p>
+              <p className="text-sm text-gray-300">Could not render the document. Try downloading instead.</p>
+              {onDownload && (
+                <button onClick={() => { onDownload(); onClose(); }}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium">
+                  Download PDF
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Canvas + text layer */}
+          <div className={`relative shadow-2xl rounded-sm overflow-hidden ${loading || error ? 'hidden' : ''}`}>
+            <canvas ref={canvasRef} className="block" />
+            <div ref={textLayerRef} className="pdf-text-layer" />
+            {rendering && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/20 pointer-events-none">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom page bar */}
+        {!loading && !error && multiPage && (
+          <div className="flex items-center justify-center gap-4 py-2.5
+                          bg-gray-900/80 backdrop-blur-md text-white sm:hidden shrink-0
+                          border-t border-white/10">
+            <button onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1}
+              className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-30">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="text-sm tabular-nums">{currentPage} / {numPages}</span>
+            <button onClick={() => goTo(currentPage + 1)} disabled={currentPage >= numPages}
+              className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-30">
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
       </div>
     </>
   );
