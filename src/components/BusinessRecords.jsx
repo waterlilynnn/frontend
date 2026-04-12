@@ -131,7 +131,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="pb-28 space-y-4">
+      <div className="pb-6 lg:pb-28 space-y-4">
 
         {/* Header row */}
         <div className="flex justify-between items-center gap-3">
@@ -283,35 +283,72 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
 
       {/* Pagination */}
       {!isLoading && totalPages > 1 && (
-        <div className="fixed bottom-4 left-0 right-4 lg:left-64 z-10 px-4 lg:px-0">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between">
-            <span className="text-xs sm:text-sm text-gray-700">
-              Page <span className="font-medium">{currentPage}</span> / <span className="font-medium">{totalPages}</span>
-              <span className="hidden sm:inline text-gray-400 ml-2">({totalCount} records)</span>
+      <>
+        <div className="hidden lg:block fixed bottom-4 left-64 right-4 z-10">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
+            <span className="text-sm text-gray-700">
+              Page <span className="font-medium">{currentPage}</span> of{' '}
+              <span className="font-medium">{totalPages}</span>
+              <span className="text-gray-400 ml-2">(records)</span>
             </span>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-lg text-sm ${
-                  currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
                 }`}
               >
-                <ChevronLeft className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Previous</span>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
               </button>
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-lg text-sm ${
-                  currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-emerald-700 text-white hover:bg-emerald-800'
                 }`}
               >
-                <span className="hidden sm:inline">Next</span><ChevronRight className="h-4 w-4 sm:ml-1" />
+                Next <ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
           </div>
         </div>
-      )}
+
+        <div className="lg:hidden mt-4 flex items-center justify-between px-1">
+          <span className="text-xs text-gray-500">
+            Page {currentPage} / {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-lg ${
+                currentPage === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
+              }`}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-lg ${
+                currentPage === totalPages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-emerald-700 text-white hover:bg-emerald-800'
+              }`}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </>
+    )}
     </div>
   );
 };
