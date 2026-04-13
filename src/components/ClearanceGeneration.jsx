@@ -261,7 +261,14 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
         </div>
       )}
 
-      {showViewer && pdfUrl && <PDFViewer url={pdfUrl} onClose={closeViewer} onDownload={handleDownload} />}
+      {showViewer && pdfUrl && (
+        <PDFViewer
+          url={pdfUrl}
+          title={viewingControlNumber || 'Clearance Document'}  
+          onClose={closeViewer}
+          onDownload={handleDownload}
+        />
+      )}
 
       <div className="pb-6 lg:pb-28 space-y-4">
         <div className="flex justify-between items-center">
