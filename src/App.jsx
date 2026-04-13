@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import { useEffect, useState } from 'react';
+import { useSessionTimeout } from './hooks/useSessionTimeout.jsx';
 
 import SidebarLayout from './components/SidebarLayout';
 import Login from './pages/Login';
@@ -40,7 +41,7 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token      = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (!isLoading && (!token || !storedUser || !user)) {
       navigate('/login', { replace: true });
@@ -66,6 +67,9 @@ const AppRoutes = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const location = useLocation();
 
+  // Inactivity timer 
+  useSessionTimeout();
+
   useEffect(() => {
     const needsChange = localStorage.getItem('needsPasswordChange');
     if (user && needsChange === 'true' && location.pathname !== '/change-password') {
@@ -82,13 +86,13 @@ const AppRoutes = () => {
           style: { background: '#fff', color: '#363636', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', borderRadius: '0.5rem' },
         }}
       />
-      
-      <ChangePassword 
-        isOpen={showChangePassword} 
+
+      <ChangePassword
+        isOpen={showChangePassword}
         onClose={() => {
           setShowChangePassword(false);
           localStorage.removeItem('needsPasswordChange');
-        }} 
+        }}
       />
 
       <Routes>

@@ -8,25 +8,19 @@ const decodeJwt = (token) => {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+      atob(base64).split('').map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
     );
     return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token      = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-
     if (token && storedUser) {
       try {
         const payload = decodeJwt(token);
@@ -50,35 +44,29 @@ export const AuthProvider = ({ children }) => {
       const { access_token } = tokenRes.data;
 
       const payload = decodeJwt(access_token);
-      if (!payload || !payload.sub) {
-        throw new Error('Invalid token received');
-      }
+      if (!payload?.sub) throw new Error('Invalid token');
 
       let formattedUser;
-
       try {
         const usersRes = await API.get('/users', {
           headers: { Authorization: `Bearer ${access_token}` },
         });
         const userData = usersRes.data.find(u => u.id === parseInt(payload.sub));
-
         if (userData) {
           formattedUser = {
-            id:         userData.id,
-            email:      userData.email,
-            full_name:  userData.full_name,
-            role:       userData.role.toLowerCase(),
-            is_active:  userData.is_active,
+            id:        userData.id,
+            email:     userData.email,
+            full_name: userData.full_name,
+            role:      userData.role.toLowerCase(),
+            is_active: userData.is_active,
           };
         }
-      } catch {
-        // fallback — build minimal user from JWT payload
-      }
+      } catch {}
 
       if (!formattedUser) {
         formattedUser = {
           id:        parseInt(payload.sub),
-          email:     email,
+          email,
           full_name: email.split('@')[0],
           role:      (payload.role || 'staff').toLowerCase(),
           is_active: true,
@@ -88,24 +76,9 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(formattedUser));
       setUser(formattedUser);
-
-      // BUG FIX: The `needsPasswordChange` flag was checked in App.jsx to show
-      // the forced-change modal, but nothing ever SET it — the modal could never
-      // appear.  We now set it when the backend indicates the user is logging in
-      // for the first time (login_attempts === 0 on the JWT payload, if present)
-      // OR when a custom claim `force_password_change` is present.
-      // Admins who create staff accounts can also include this in the token.
-      if (payload.force_password_change || payload.login_attempts === 0) {
-        localStorage.setItem('needsPasswordChange', 'true');
-      }
-
       return { success: true, user: formattedUser };
     } catch (error) {
-      const errMsg =
-        error.response?.data?.detail ||
-        error.message ||
-        'Login failed';
-      return { success: false, error: errMsg };
+      return { success: false, error: error.response?.data?.detail || error.message || 'Login failed' };
     }
   };
 
@@ -113,19 +86,16 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     if (token) {
       try {
-        await API.post('/users/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch (error) {
-        console.error('Logout API call failed:', error);
-      }
+        await API.post('/users/logout', {}, { headers: { Authorization: `Bearer ${token}` } });
+      } catch {}
     }
-
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('needsPasswordChange');
     setUser(null);
-    window.location.replace('/login');
+
+    window.history.replaceState(null, '', window.location.pathname);
+    window.location.replace('/');
   };
 
   return (
@@ -136,10 +106,7 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === null) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
-

@@ -4,15 +4,16 @@ import { useAuth } from '../../hooks/useAuth';
 import API from '../../config/api';
 import toast from 'react-hot-toast';
 import {
-  Plus, Trash2, Edit2, Save, X,
+  Plus, Edit2, Save, X,
   AlertCircle, Upload, Eye,
   Archive, ArchiveRestore,
   UserPlus, ShieldCheck, Mail,
   CheckCircle, Info, Shield, UserCog,
 } from 'lucide-react';
 
-const HAULER_TYPES = ['City', 'Barangay', 'Accredited', 'Hazardous', 'Exempted', 'No Contract'];
-const SCOPE_ALL   = '__ALL__';
+const HAULER_TYPES_REQ = ['City', 'Barangay', 'Accredited', 'Hazardous'];
+
+const SCOPE_ALL = '__ALL__';
 const uid = () => `fmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
 const ScopeBadge = ({ haulerType }) =>
@@ -20,6 +21,8 @@ const ScopeBadge = ({ haulerType }) =>
     ? <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-600">{haulerType}</span>
     : <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-500 uppercase tracking-wide">Global</span>;
 
+
+// BIN FORMATS
 const BinFormatCard = ({ fmt, index, onToggle, onSegmentsChange, onLabelChange }) => {
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelDraft, setLabelDraft]     = useState(fmt.label);
@@ -73,6 +76,8 @@ const BinFormatCard = ({ fmt, index, onToggle, onSegmentsChange, onLabelChange }
   );
 };
 
+
+// REQUIREMENTS TAB
 const RequirementsTab = () => {
   const qc = useQueryClient();
   const [activeScope, setActiveScope] = useState(SCOPE_ALL);
@@ -87,14 +92,24 @@ const RequirementsTab = () => {
     queryKey: ['reqTemplates'],
     queryFn: async () => (await API.get('/admin/settings/requirements?include_inactive=true')).data,
   });
+
   const createMutation = useMutation({
     mutationFn: (body) => API.post('/admin/settings/requirements', body),
-    onSuccess: () => { toast.success('Requirement added'); qc.invalidateQueries({ queryKey: ['reqTemplates'] }); setShowAdd(false); setNewLabel(''); setNewDesc(''); setNewHauler(''); },
+    onSuccess: () => {
+      toast.success('Requirement added');
+      qc.invalidateQueries({ queryKey: ['reqTemplates'] });
+      setShowAdd(false); setNewLabel(''); setNewDesc(''); setNewHauler('');
+    },
     onError: (e) => toast.error(e.response?.data?.detail || 'Failed to add'),
   });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, body }) => API.put(`/admin/settings/requirements/${id}`, body),
-    onSuccess: () => { toast.success('Updated'); qc.invalidateQueries({ queryKey: ['reqTemplates'] }); setEditingId(null); },
+    onSuccess: () => {
+      toast.success('Updated');
+      qc.invalidateQueries({ queryKey: ['reqTemplates'] });
+      setEditingId(null);
+    },
     onError: (e) => toast.error(e.response?.data?.detail || 'Failed to update'),
   });
 
@@ -117,8 +132,10 @@ const RequirementsTab = () => {
           <Plus className="h-4 w-4" />Add Requirement
         </button>
       </div>
+
+      {/* Scope tabs */}
       <div className="flex flex-wrap gap-1.5">
-        {[SCOPE_ALL, 'global', ...HAULER_TYPES].map((scope) => {
+        {[SCOPE_ALL, 'global', ...HAULER_TYPES_REQ].map((scope) => {
           const label = scope === SCOPE_ALL ? 'All' : scope === 'global' ? 'Global' : scope;
           const count = templates.filter(t => {
             if (scope === SCOPE_ALL) return t.is_active;
@@ -134,6 +151,8 @@ const RequirementsTab = () => {
           );
         })}
       </div>
+
+      {/* Add form */}
       {showAdd && (
         <div className="border border-forest-200 bg-forest-50 rounded-xl p-4 space-y-3">
           <h4 className="text-sm font-semibold text-forest-800">New Requirement Item</h4>
@@ -148,7 +167,7 @@ const RequirementsTab = () => {
               <select value={newHauler} onChange={(e) => setNewHauler(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-forest-500 focus:outline-none">
                 <option value="">Global (all hauler types)</option>
-                {HAULER_TYPES.map((h) => <option key={h} value={h}>{h}</option>)}
+                {HAULER_TYPES_REQ.map((h) => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
           </div>
@@ -167,6 +186,7 @@ const RequirementsTab = () => {
           </div>
         </div>
       )}
+
       {visible.length === 0
         ? <div className="text-center py-12 text-gray-400 text-sm">No requirements for this scope yet.</div>
         : (
@@ -185,7 +205,7 @@ const RequirementsTab = () => {
                             <select value={editDraft.hauler_type || ''} onChange={(e) => setEditDraft(d => ({ ...d, hauler_type: e.target.value || null }))}
                               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-forest-400">
                               <option value="">Global</option>
-                              {HAULER_TYPES.map((h) => <option key={h} value={h}>{h}</option>)}
+                              {HAULER_TYPES_REQ.map((h) => <option key={h} value={h}>{h}</option>)}
                             </select>
                           </div>
                           <input value={editDraft.description} onChange={(e) => setEditDraft(d => ({ ...d, description: e.target.value }))}
@@ -225,11 +245,9 @@ const RequirementsTab = () => {
                   {inactiveList.map((t) => (
                     <div key={t.id} className="border border-gray-100 bg-gray-50 rounded-xl p-4 opacity-70">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-gray-500 line-through">{t.label}</span>
-                            <ScopeBadge haulerType={t.hauler_type} />
-                          </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-500 line-through">{t.label}</span>
+                          <ScopeBadge haulerType={t.hauler_type} />
                         </div>
                         <button onClick={() => updateMutation.mutate({ id: t.id, body: { is_active: true } })}
                           className="px-3 py-1 text-xs border border-emerald-800 text-emerald-800 rounded hover:bg-forest-50">Activate</button>
@@ -245,6 +263,8 @@ const RequirementsTab = () => {
   );
 };
 
+
+// BIN FORMATS TAB
 const BinFormatsTab = () => {
   const qc = useQueryClient();
   const { data: serverFormats = [], isLoading } = useQuery({
@@ -266,9 +286,9 @@ const BinFormatsTab = () => {
 
   if (isLoading || formats === null) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700" /></div>;
 
-  const activeCount   = formats.filter(f => f.is_active).length;
   const activeFormats = formats.filter(f => f.is_active);
   const inactiveFmts  = formats.filter(f => !f.is_active);
+  const activeCount   = activeFormats.length;
 
   return (
     <div className="space-y-3">
@@ -337,14 +357,18 @@ const BinFormatsTab = () => {
   );
 };
 
+
+// BUSINESS LINES TAB 
 const BusinessLinesTab = () => {
   const qc = useQueryClient();
-  const [lines, setLines]       = useState([]);
-  const [newLine, setNewLine]   = useState('');
-  const [exempted, setExempted] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState('');
+  const [lines, setLines]             = useState([]);
+  const [newLine, setNewLine]         = useState('');
+  const [exempted, setExempted]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState('');
+  const [editingLine, setEditingLine] = useState(null);
+  const [editDraft, setEditDraft]     = useState('');
 
   useEffect(() => {
     (async () => {
@@ -369,6 +393,19 @@ const BusinessLinesTab = () => {
     setNewLine('');
   };
 
+  const saveLine = () => {
+    const trimmed = editDraft.trim();
+    if (!trimmed) return;
+    if (trimmed !== editingLine && lines.some(l => l.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('A business line with that name already exists');
+      return;
+    }
+    setLines(lines.map(l => l === editingLine ? trimmed : l).sort((a, b) => a.localeCompare(b)));
+    setExempted(ex => ex.map(e => e === editingLine ? trimmed : e));
+    setEditingLine(null);
+    setEditDraft('');
+  };
+
   const saveChanges = async () => {
     setSaving(true);
     try {
@@ -387,37 +424,87 @@ const BusinessLinesTab = () => {
 
   return (
     <div className="space-y-4">
+      {/* Add new line */}
       <div className="flex gap-2 mb-4">
-        <input type="text" value={newLine} onChange={(e) => { setNewLine(e.target.value); setError(''); }}
+        <input
+          type="text"
+          value={newLine}
+          onChange={(e) => { setNewLine(e.target.value); setError(''); }}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addLine())}
-          placeholder="Add new business line..." className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-forest-500" />
+          placeholder="Add new business line…"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-forest-500"
+        />
         <button onClick={addLine} className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">Add</button>
       </div>
+
       {error && <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
+
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {lines.map(line => (
           <div key={line} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <input type="checkbox" checked={exempted.includes(line)} onChange={() => setExempted(prev => prev.includes(line) ? prev.filter(e => e !== line) : [...prev, line])}
-                className="h-4 w-4 text-emerald-700 rounded" title="Exempt from requirements" />
-              <span className="text-sm text-gray-700">{line}</span>
-              {exempted.includes(line) && <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Exempted</span>}
-            </div>
-            <button onClick={() => { setLines(lines.filter(l => l !== line)); setExempted(exempted.filter(e => e !== line)); }} className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+            {editingLine === line ? (
+              /* Inline edit mode */
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  autoFocus
+                  value={editDraft}
+                  onChange={e => setEditDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') saveLine();
+                    if (e.key === 'Escape') setEditingLine(null);
+                  }}
+                  className="flex-1 px-2 py-1 border border-emerald-400 rounded text-sm focus:outline-none"
+                />
+                <button onClick={saveLine} className="px-2 py-1 bg-emerald-700 text-white rounded text-xs hover:bg-emerald-800">Save</button>
+                <button onClick={() => setEditingLine(null)} className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">Cancel</button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={exempted.includes(line)}
+                    onChange={() => setExempted(prev => prev.includes(line) ? prev.filter(e => e !== line) : [...prev, line])}
+                    className="h-4 w-4 text-emerald-700 rounded"
+                    title="Exempt from requirements"
+                  />
+                  <span className="text-sm text-gray-700 truncate">{line}</span>
+                  {exempted.includes(line) && (
+                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full shrink-0">Exempted</span>
+                  )}
+                </div>
+                {/* Edit button */}
+                <button
+                  onClick={() => { setEditingLine(line); setEditDraft(line); }}
+                  className="shrink-0 ml-2 p-1.5 text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+                  title="Edit business line"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
         ))}
       </div>
-      {exempted.length > 0 && <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-700"><strong>Note:</strong> Exempted business lines skip the requirements checklist.</div>}
+
+      {exempted.length > 0 && (
+        <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-700 border border-amber-100">
+          <strong>Note:</strong> Exempted business lines skip the requirements checklist.
+        </div>
+      )}
+
       <div className="flex justify-end pt-4 border-t border-gray-200">
         <button onClick={saveChanges} disabled={saving}
           className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50">
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saving ? 'Saving…' : 'Save Changes'}
         </button>
       </div>
     </div>
   );
 };
 
+
+// SIGNATORIES TAB
 const removeBackground = (file) =>
   new Promise((resolve) => {
     const img = new Image();
@@ -600,6 +687,8 @@ const SignatoriesTab = () => {
   );
 };
 
+
+// ARCHIVE TAB
 const ArchiveTab = () => {
   const qc = useQueryClient();
   const [confirmYear, setConfirmYear] = useState(null);
@@ -628,20 +717,19 @@ const ArchiveTab = () => {
       <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
         <p className="font-semibold mb-1">About archiving</p>
         <p className="text-xs leading-relaxed">
-          Archiving hides past-year business records from the main list. Records are <strong>not deleted</strong> — they remain in the database and can be restored at any time.
+          Archiving hides past-year business records from the main list. Records are <strong>not deleted</strong> — they can be restored at any time.
         </p>
       </div>
       {years.length === 0 ? (
-        <div className="text-center py-12 text-gray-400 text-sm">No past-year records found to archive.</div>
+        <div className="text-center py-12 text-gray-400 text-sm">No past-year records found.</div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Year</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Records</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Status</th>
-                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">Action</th>
+                {['Year', 'Records', 'Status', 'Action'].map(col => (
+                  <th key={col} className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">{col}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -653,7 +741,7 @@ const ArchiveTab = () => {
                     {item.already_archived
                       ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600"><Archive className="h-3 w-3" />Archived</span>
                       : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>}
-                   </td>
+                  </td>
                   <td className="px-5 py-3">
                     {item.already_archived ? (
                       <button onClick={() => { setConfirmYear(item.year); setAction('unarchive'); }}
@@ -666,11 +754,11 @@ const ArchiveTab = () => {
                         <Archive className="h-3.5 w-3.5" />Archive
                       </button>
                     )}
-                   </td>
-                 </tr>
+                  </td>
+                </tr>
               ))}
             </tbody>
-           </table>
+          </table>
         </div>
       )}
       {confirmYear && (
@@ -700,24 +788,24 @@ const ArchiveTab = () => {
   );
 };
 
-const AdminAccountTab = () => {
-  const [currentAdmin, setCurrentAdmin] = useState(null);
-  const [deactivatedAdmins, setDeactivatedAdmins] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [email, setEmail] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
-  const [done, setDone] = useState(false);
-  const [countdown, setCountdown] = useState(3);
-  const [result, setResult] = useState(null);
-  const [restoringId, setRestoringId] = useState(null);
-  const [activating, setActivating] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+// ADMIN ACCOUNT TAB
+const AdminAccountTab = () => {
+  const [currentAdmin, setCurrentAdmin]           = useState(null);
+  const [deactivatedAdmins, setDeactivatedAdmins] = useState([]);
+  const [loading, setLoading]                     = useState(true);
+  const [showForm, setShowForm]                   = useState(false);
+  const [email, setEmail]                         = useState('');
+  const [fullName, setFullName]                   = useState('');
+  const [creating, setCreating]                   = useState(false);
+  const [confirmed, setConfirmed]                 = useState(false);
+  const [done, setDone]                           = useState(false);
+  const [countdown, setCountdown]                 = useState(3);
+  const [result, setResult]                       = useState(null);
+  const [restoringId, setRestoringId]             = useState(null);
+  const [activating, setActivating]               = useState(false);
+
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -728,11 +816,8 @@ const AdminAccountTab = () => {
       ]);
       setCurrentAdmin(adminRes.data.admin);
       setDeactivatedAdmins(deactivatedRes.data.admins || []);
-    } catch (err) {
-      console.error('Failed to fetch admin data:', err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
@@ -748,70 +833,40 @@ const AdminAccountTab = () => {
   }, [done, countdown]);
 
   const handleCreate = async () => {
-    if (!email.trim() || !fullName.trim()) {
-      toast.error('Email and name are required');
-      return;
-    }
-    if (!confirmed) {
-      toast.error('Please confirm you understand the consequences');
-      return;
-    }
+    if (!email.trim() || !fullName.trim()) { toast.error('Email and name are required'); return; }
+    if (!confirmed) { toast.error('Please confirm you understand the consequences'); return; }
     setCreating(true);
     try {
-      const r = await API.post('/admin/settings/admin-account', {
-        email: email.trim(),
-        full_name: fullName.trim(),
-      });
+      const r = await API.post('/admin/settings/admin-account', { email: email.trim(), full_name: fullName.trim() });
       setResult(r.data);
       setDone(true);
-      toast.success(r.data.is_restore 
-        ? 'Admin account restored successfully!' 
-        : 'New admin account created successfully!');
+      toast.success(r.data.is_restore ? 'Admin account restored!' : 'New admin account created!');
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to create account');
-    } finally {
-      setCreating(false);
-    }
+    } finally { setCreating(false); }
   };
 
   const handleRestore = async (adminId, adminEmail) => {
-    if (!window.confirm(`Restore ${adminEmail} as active admin?\n\nThis will deactivate the current admin account.`)) {
-      return;
-    }
+    if (!window.confirm(`Restore ${adminEmail} as active admin?\n\nThis will deactivate the current admin account.`)) return;
     setRestoringId(adminId);
     setActivating(true);
     try {
       const r = await API.post(`/admin/settings/admin-account/activate/${adminId}`);
-      setResult({
-        message: r.data.message,
-        email: r.data.activated.email,
-        full_name: r.data.activated.full_name,
-        email_sent: false,
-        old_admin_notified: false,
-        is_restore: true,
-        temporary_password: null,
-      });
+      setResult({ message: r.data.message, email: r.data.activated.email, full_name: r.data.activated.full_name, email_sent: false, old_admin_notified: false, is_restore: true, temporary_password: null });
       setDone(true);
       toast.success(`Admin account ${adminEmail} restored!`);
       fetchData();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to restore admin account');
-    } finally {
-      setRestoringId(null);
-      setActivating(false);
-    }
+      toast.error(e.response?.data?.detail || 'Failed to restore');
+    } finally { setRestoringId(null); setActivating(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin h-8 w-8 border-b-2 border-emerald-600 rounded-full" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex justify-center py-12"><div className="animate-spin h-8 w-8 border-b-2 border-emerald-600 rounded-full" /></div>;
 
   if (done) {
+    const CIRC = 2 * Math.PI * 28;
+    const ringOffset = CIRC * (1 - countdown / 3);
     return (
       <div className="max-w-md mx-auto space-y-5 py-8">
         <div className="text-center">
@@ -822,54 +877,32 @@ const AdminAccountTab = () => {
             {result?.is_restore ? 'Admin Account Restored' : 'Admin Access Transferred'}
           </h3>
           <p className="text-sm text-gray-500">
-            {result?.is_restore 
-              ? 'The admin account has been restored and is now active.'
-              : 'The new admin account has been created and the previous admin has been notified.'}
+            {result?.is_restore ? 'The admin account has been restored.' : 'New admin created and previous admin notified.'}
           </p>
         </div>
-
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            {result?.email_sent !== false && result?.email_sent !== undefined
-              ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-              : <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />}
-            <span className="text-gray-700">
-              Admin credentials email —{' '}
-              <span className={result?.email_sent !== false && result?.email_sent !== undefined ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
-                {result?.email_sent !== false && result?.email_sent !== undefined ? 'Sent' : 'Not sent (restored account)'}
-              </span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {result?.old_admin_notified
-              ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
-              : <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />}
-            <span className="text-gray-700">
-              Previous admin notification —{' '}
-              <span className={result?.old_admin_notified ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
-                {result?.old_admin_notified ? 'Sent' : 'Not sent / Not applicable'}
-              </span>
-            </span>
+            {result?.email_sent ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" /> : <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />}
+            <span className="text-gray-700">Admin email — <span className={result?.email_sent ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>{result?.email_sent ? 'Sent' : 'Not sent'}</span></span>
           </div>
           {!result?.email_sent && result?.temporary_password && (
             <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-xs text-amber-700 font-medium mb-1">
-                ⚠ Email failed — provide this password manually:
-              </p>
-              <p className="font-mono text-base tracking-widest text-amber-900 select-all">
-                {result.temporary_password}
-              </p>
+              <p className="text-xs text-amber-700 font-medium mb-1">⚠ Email failed — share this password manually:</p>
+              <p className="font-mono text-base tracking-widest text-amber-900 select-all">{result.temporary_password}</p>
             </div>
           )}
         </div>
-
         <div className="flex items-center justify-center gap-3 py-4 bg-red-50 border border-red-200 rounded-xl">
-          <div className="flex items-center justify-center h-10 w-10 rounded-full bg-red-100 text-red-700 font-bold text-lg tabular-nums">
-            {countdown}
+          <div className="relative w-12 h-12">
+            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="28" fill="none" stroke="#fecaca" strokeWidth="6" />
+              <circle cx="32" cy="32" r="28" fill="none" stroke="#dc2626" strokeWidth="6"
+                strokeDasharray={CIRC} strokeDashoffset={ringOffset} strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 1s linear' }} />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-red-700">{countdown}</span>
           </div>
-          <p className="text-sm text-red-700 font-medium">
-            Logging you out in {countdown} second{countdown !== 1 ? 's' : ''}…
-          </p>
+          <p className="text-sm text-red-700 font-medium">Logging you out in {countdown}s…</p>
         </div>
       </div>
     );
@@ -881,38 +914,31 @@ const AdminAccountTab = () => {
         <Info className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
         <div className="text-sm text-amber-800">
           <p className="font-semibold mb-1">Single Admin Policy</p>
-          <p>
-            Only one admin account can be active at a time. Creating a new admin or restoring a previous
-            admin will immediately deactivate the current admin account.
-          </p>
+          <p>Only one admin account can be active at a time. Creating or restoring an admin will immediately deactivate the current one.</p>
         </div>
       </div>
 
+      {/* Current admin */}
       <div className="bg-white border border-gray-200 rounded-xl p-5">
         <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <Shield className="h-4 w-4 text-emerald-600" />
-          Current Active Admin
+          <Shield className="h-4 w-4 text-emerald-600" />Current Active Admin
         </h4>
         {currentAdmin ? (
           <div className="space-y-1">
             <p className="text-sm text-gray-900">Full Name: <strong>{currentAdmin.full_name}</strong></p>
             <p className="text-sm text-gray-900">Email: <strong>{currentAdmin.email}</strong></p>
-            {currentAdmin.created_at && (
-              <p className="text-xs text-gray-400">
-                Account created {new Date(currentAdmin.created_at).toLocaleDateString()}
-              </p>
-            )}
+            {currentAdmin.created_at && <p className="text-xs text-gray-400">Account created {new Date(currentAdmin.created_at).toLocaleDateString()}</p>}
           </div>
         ) : (
           <p className="text-sm text-gray-400 italic">No active admin found</p>
         )}
       </div>
 
+      {/* Previous admins */}
       {deactivatedAdmins.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <ArchiveRestore className="h-4 w-4 text-amber-600" />
-            Previous Admin Accounts (Inactive)
+            <ArchiveRestore className="h-4 w-4 text-amber-600" />Previous Admin Accounts (Inactive)
           </h4>
           <div className="space-y-3">
             {deactivatedAdmins.map(admin => (
@@ -920,42 +946,26 @@ const AdminAccountTab = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-800">{admin.full_name}</p>
                   <p className="text-xs text-gray-500">{admin.email}</p>
-                  {admin.deactivated_at && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Deactivated: {new Date(admin.deactivated_at).toLocaleDateString()}
-                    </p>
-                  )}
+                  {admin.deactivated_at && <p className="text-xs text-gray-400 mt-0.5">Deactivated: {new Date(admin.deactivated_at).toLocaleDateString()}</p>}
                 </div>
-                <button
-                  onClick={() => handleRestore(admin.id, admin.email)}
-                  disabled={activating && restoringId === admin.id}
-                  className="inline-flex items-center gap-1 px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50 disabled:opacity-50"
-                >
-                  {activating && restoringId === admin.id ? (
-                    <><span className="h-3 w-3 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin mr-1" />Restoring...</>
-                  ) : (
-                    <><ArchiveRestore className="h-3.5 w-3.5" />Restore</>
-                  )}
+                <button onClick={() => handleRestore(admin.id, admin.email)} disabled={activating && restoringId === admin.id}
+                  className="inline-flex items-center gap-1 px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50 disabled:opacity-50">
+                  {activating && restoringId === admin.id
+                    ? <><span className="h-3 w-3 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin mr-1" />Restoring…</>
+                    : <><ArchiveRestore className="h-3.5 w-3.5" />Restore</>}
                 </button>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-3">
-            Restoring a previous admin will deactivate the current admin and restore access to the selected account.
-          </p>
         </div>
       )}
 
+      {/* Create new */}
       {!showForm ? (
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
-          >
-            <UserCog className="h-4 w-4" />
-            Create New Admin Account
-          </button>
-        </div>
+        <button onClick={() => setShowForm(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50">
+          <UserCog className="h-4 w-4" />Create New Admin Account
+        </button>
       ) : (
         <div className="bg-white border border-red-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
@@ -963,61 +973,30 @@ const AdminAccountTab = () => {
             <h4 className="text-sm font-semibold text-red-800">Create New Admin Account</h4>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Full Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={fullName}
-              onChange={e => setFullName(e.target.value)}
-              placeholder="e.g. Juan Dela Cruz"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
-            />
+            <label className="block text-xs font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+            <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Juan Dela Cruz"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="newadmin@example.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              A generated password will be sent to this email. If an admin account with this email already exists (even if deactivated), it will be restored.
-            </p>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="newadmin@example.com"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500" />
+            <p className="text-xs text-gray-400 mt-1">If an account with this email already exists, it will be restored instead.</p>
           </div>
           <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={e => setConfirmed(e.target.checked)}
-              className="h-4 w-4 text-red-600 rounded mt-0.5"
-            />
+            <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="h-4 w-4 text-red-600 rounded mt-0.5" />
             <span className="text-xs text-red-700">
-              I understand that creating or restoring an admin account will{' '}
-              <strong>immediately deactivate the current admin account</strong> and
-              log out the current session.
+              I understand that this will <strong>immediately deactivate the current admin account</strong> and log out the current session.
             </span>
           </label>
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-            <button
-              onClick={() => { setShowForm(false); setEmail(''); setFullName(''); setConfirmed(false); }}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={creating || !confirmed || !email.trim() || !fullName.trim()}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50 transition-colors"
-            >
-              {creating ? (
-                <><span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating…</>
-              ) : (
-                <><UserCog className="h-3.5 w-3.5" />Create & Transfer</>
-              )}
+            <button onClick={() => { setShowForm(false); setEmail(''); setFullName(''); setConfirmed(false); }}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleCreate} disabled={creating || !confirmed || !email.trim() || !fullName.trim()}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50">
+              {creating
+                ? <><span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating…</>
+                : <><UserCog className="h-3.5 w-3.5" />Create & Transfer</>}
             </button>
           </div>
         </div>
@@ -1026,20 +1005,19 @@ const AdminAccountTab = () => {
   );
 };
 
+
+// INSPECTION FREQUENCY TAB
 const InspectionFrequencyTab = () => {
   const qc = useQueryClient();
   const [frequency, setFrequency] = useState(1);
-  const [period, setPeriod] = useState('year');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [period, setPeriod]       = useState('year');
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [dirty, setDirty]         = useState(false);
 
   useEffect(() => {
     API.get('/admin/settings/inspection-frequency')
-      .then(res => {
-        setFrequency(res.data.frequency || 1);
-        setPeriod(res.data.period || 'year');
-      })
+      .then(res => { setFrequency(res.data.frequency || 1); setPeriod(res.data.period || 'year'); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -1051,117 +1029,64 @@ const InspectionFrequencyTab = () => {
       toast.success('Inspection frequency saved');
       setDirty(false);
       qc.invalidateQueries(['inspectionFrequency']);
-    } catch {
-      toast.error('Failed to save');
-    } finally {
-      setSaving(false);
-    }
+    } catch { toast.error('Failed to save'); }
+    finally { setSaving(false); }
   };
 
-  if (loading) return (
-    <div className="flex justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700" />
-    </div>
-  );
+  if (loading) return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700" /></div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-gray-500">
-            Set how many times a business can be inspected per period. Once the limit is reached, 
-            the Inspect button will be disabled until the next period.
-          </p>
-        </div>
-        <button 
-          onClick={handleSave} 
-          disabled={saving || !dirty}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800 disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Save Changes'}
+        <p className="text-sm text-gray-500">Set how many times a business can be inspected per period.</p>
+        <button onClick={handleSave} disabled={saving || !dirty}
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800 disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save Changes'}
         </button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="p-5 space-y-5">
-          {/* Maximum Inspections */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Maximum Inspections per Period
-            </label>
-            <select
-              value={frequency}
-              onChange={(e) => { setFrequency(Number(e.target.value)); setDirty(true); }}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-32 focus:outline-none focus:border-emerald-500"
-            >
-              <option value={1}>1 time</option>
-              <option value={2}>2 times</option>
-              <option value={3}>3 times</option>
-              <option value={4}>4 times</option>
-              <option value={6}>6 times</option>
-              <option value={12}>12 times</option>
-            </select>
+      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Maximum Inspections per Period</label>
+          <select value={frequency} onChange={(e) => { setFrequency(Number(e.target.value)); setDirty(true); }}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-32 focus:outline-none focus:border-emerald-500">
+            {[1, 2, 3, 4, 6, 12].map(n => <option key={n} value={n}>{n} time{n > 1 ? 's' : ''}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Period</label>
+          <div className="flex flex-wrap gap-4">
+            {[
+              { value: 'month',     label: 'Per Month' },
+              { value: 'quarter',   label: 'Per Quarter (3 months)' },
+              { value: 'half_year', label: 'Per Half Year (6 months)' },
+              { value: 'year',      label: 'Per Year' },
+            ].map(opt => (
+              <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" value={opt.value} checked={period === opt.value}
+                  onChange={() => { setPeriod(opt.value); setDirty(true); }}
+                  className="h-4 w-4 text-emerald-700 focus:ring-emerald-500" />
+                <span className="text-sm text-gray-700">{opt.label}</span>
+              </label>
+            ))}
           </div>
-
-          {/* Period Options */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Period
-            </label>
-            <div className="flex flex-wrap gap-4">
-              {[
-                { value: 'month', label: 'Per Month' },
-                { value: 'quarter', label: 'Per Quarter (3 months)' },
-                { value: 'half_year', label: 'Per Half Year (6 months)' },
-                { value: 'year', label: 'Per Year' },
-              ].map(opt => (
-                <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value={opt.value}
-                    checked={period === opt.value}
-                    onChange={() => { setPeriod(opt.value); setDirty(true); }}
-                    className="h-4 w-4 text-emerald-700 focus:ring-emerald-500"
-                  />
-                  <span className="text-sm text-gray-700">{opt.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Example / Info */}
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-            <p className="text-xs text-gray-500">
-              <span className="font-medium">Example:</span> If set to <strong>{frequency}</strong> time(s) per <strong>{period === 'month' ? 'month' : period === 'quarter' ? 'quarter' : period === 'half_year' ? 'half year' : 'year'}</strong>, 
-              a business cannot be inspected more than {frequency} time(s) within that period.
-            </p>
-          </div>
+        </div>
+        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <p className="text-xs text-gray-500">
+            <span className="font-medium">Example:</span> If set to <strong>{frequency}</strong> time(s) per <strong>{period === 'month' ? 'month' : period === 'quarter' ? 'quarter' : period === 'half_year' ? 'half year' : 'year'}</strong>,
+            a business cannot be inspected more than {frequency} time(s) within that period.
+          </p>
         </div>
       </div>
 
-      {/* Unsaved changes bar */}
       {dirty && (
         <div className="sticky bottom-0 bg-white border-t border-gray-200 rounded-b-xl px-4 py-3 flex items-center justify-between shadow-lg">
-          <span className="text-sm text-amber-600 flex items-center gap-1.5">
-            <AlertCircle className="h-4 w-4" />
-            Unsaved changes
-          </span>
+          <span className="text-sm text-amber-600 flex items-center gap-1.5"><AlertCircle className="h-4 w-4" />Unsaved changes</span>
           <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                setFrequency(1);
-                setPeriod('year');
-                setDirty(false);
-              }}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Discard
-            </button>
-            <button 
-              onClick={handleSave} 
-              disabled={saving}
-              className="px-4 py-1.5 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50"
-            >
+            <button onClick={() => { setFrequency(1); setPeriod('year'); setDirty(false); }}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Discard</button>
+            <button onClick={handleSave} disabled={saving}
+              className="px-4 py-1.5 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50">
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
@@ -1171,14 +1096,16 @@ const InspectionFrequencyTab = () => {
   );
 };
 
+
+// MAIN SETTINGS PAGE
 const TABS = [
-  { key: 'requirements',  label: 'Requirements'  },
-  { key: 'bin',           label: 'BIN Formats'   },
-  { key: 'businessLines', label: 'Business Lines' },
-  { key: 'signatories',   label: 'Signatories'   },
-  { key: 'archive',       label: 'Archive'        },
-  { key: 'adminAccount',  label: 'Admin Account'  },
-  { key: 'inspectionFreq', label: 'Inspection Frequency' },
+  { key: 'requirements',   label: 'Requirements'          },
+  { key: 'bin',            label: 'BIN Formats'           },
+  { key: 'businessLines',  label: 'Business Lines'        },
+  { key: 'signatories',    label: 'Signatories'           },
+  { key: 'archive',        label: 'Archive'               },
+  { key: 'adminAccount',   label: 'Admin Account'         },
+  { key: 'inspectionFreq', label: 'Inspection Frequency'  },
 ];
 
 const AdminSettings = () => {
@@ -1187,6 +1114,7 @@ const AdminSettings = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
       <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
+
       <div className="border-b border-gray-200 -mx-4 sm:mx-0 px-4 sm:px-0">
         <nav className="flex gap-1 sm:gap-6 overflow-x-auto pb-px">
           {TABS.map(({ key, label }) => (
@@ -1201,13 +1129,14 @@ const AdminSettings = () => {
           ))}
         </nav>
       </div>
+
       <div>
-        {tab === 'requirements'  && <RequirementsTab />}
-        {tab === 'bin'           && <BinFormatsTab />}
-        {tab === 'businessLines' && <BusinessLinesTab />}
-        {tab === 'signatories'   && <SignatoriesTab />}
-        {tab === 'archive'       && <ArchiveTab />}
-        {tab === 'adminAccount'  && <AdminAccountTab />}
+        {tab === 'requirements'   && <RequirementsTab />}
+        {tab === 'bin'            && <BinFormatsTab />}
+        {tab === 'businessLines'  && <BusinessLinesTab />}
+        {tab === 'signatories'    && <SignatoriesTab />}
+        {tab === 'archive'        && <ArchiveTab />}
+        {tab === 'adminAccount'   && <AdminAccountTab />}
         {tab === 'inspectionFreq' && <InspectionFrequencyTab />}
       </div>
     </div>

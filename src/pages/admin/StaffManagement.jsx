@@ -4,28 +4,40 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import API from '../../config/api';
 import useIsMobile from '../../hooks/useIsMobile';
-import { Search, Plus, ChevronLeft, ChevronRight, X, Shield } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight, X, Shield, AlertTriangle, UserMinus, Info } from 'lucide-react';
 
-const PER_PAGE = 10;
+const MAX_STAFF = 5;
+const PER_PAGE  = 10;
 
+/* Helpers */
+const fmtDate = (d) => {
+  try { return format(new Date(d), 'MMM dd, yyyy'); }
+  catch { return '—'; }
+};
+
+/* Main component */
 const StaffManagement = () => {
   const isMobile = useIsMobile();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery]       = useState('');
+  const [currentPage, setCurrentPage]       = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newStaff, setNewStaff] = useState({ full_name: '', email: '' });
-  const [creating, setCreating] = useState(false);
+  // When limit is reached the admin picks one staff to deactivate first
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [selectedToDeactivate, setSelectedToDeactivate] = useState(null);
+  const [newStaff, setNewStaff]             = useState({ full_name: '', email: '' });
+  const [creating, setCreating]             = useState(false);
+  const [pendingCreate, setPendingCreate]   = useState(false);
 
   const { data: allStaff = [], isLoading, refetch } = useQuery({
     queryKey: ['staffList'],
-    queryFn: async () => {
-      const response = await API.get('/admin/staff');
-      return response.data || [];
-    },
+    queryFn: async () => (await API.get('/admin/staff')).data || [],
   });
 
-  // Client-side filter
-  const filtered = searchQuery.length >= 2
+  const activeStaff   = allStaff.filter(s => s.is_active);
+  const limitReached  = activeStaff.length >= MAX_STAFF;
+
+  /* Filtered / paginated */
+  const filtered = searchQuery.length >= 1
     ? allStaff.filter(s => {
         const q = searchQuery.toLowerCase();
         return s.full_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
@@ -34,39 +46,82 @@ const StaffManagement = () => {
 
   const totalCount = filtered.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE);
-
-  // Desktop = paginated slice, Mobile = all
-  const items = isMobile
+  const items      = isMobile
     ? filtered
     : filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
+  /* Mutations */
   const createStaff = useMutation({
-    mutationFn: async (staffData) => (await API.post('/admin/staff', staffData)).data,
+    mutationFn: async (data) => (await API.post('/admin/staff', data)).data,
     onSuccess: (data) => {
-      toast.success(`Account created. Temporary password: ${data.temporary_password}`);
+      toast.success(`Account created.\nTemporary password: ${data.temporary_password}`, { duration: 8000 });
       setShowCreateModal(false);
       setNewStaff({ full_name: '', email: '' });
+      setPendingCreate(false);
       refetch();
     },
-    onError: (error) => toast.error(error.response?.data?.detail || 'Failed to create staff account'),
+    onError: (err) => {
+      const detail = err.response?.data?.detail || '';
+      if (detail.startsWith('STAFF_LIMIT_REACHED')) {
+        toast.error(`Maximum ${MAX_STAFF} active staff reached.`);
+      } else {
+        toast.error(detail || 'Failed to create staff account');
+      }
+    },
   });
 
   const toggleStatus = useMutation({
     mutationFn: async (staffId) => (await API.patch(`/admin/staff/${staffId}/toggle-status`)).data,
-    onSuccess: (data) => { toast.success(`Staff ${data.is_active ? 'activated' : 'deactivated'}`); refetch(); },
+    onSuccess: (data, staffId) => {
+      toast.success(`Staff ${data.is_active ? 'activated' : 'deactivated'}`);
+      refetch();
+      // If we deactivated someone to make room, now open the create modal
+      if (pendingCreate && !data.is_active) {
+        setShowLimitModal(false);
+        setSelectedToDeactivate(null);
+        setShowCreateModal(true);
+        setPendingCreate(false);
+      }
+    },
     onError: () => toast.error('Failed to update status'),
   });
 
+  /* Handlers */
+  const handleNewStaffClick = () => {
+    if (limitReached) {
+      setShowLimitModal(true);
+    } else {
+      setShowCreateModal(true);
+    }
+  };
+
+  const handleDeactivateAndProceed = () => {
+    if (!selectedToDeactivate) {
+      toast.error('Please select a staff member to deactivate first.');
+      return;
+    }
+    setPendingCreate(true);
+    toggleStatus.mutate(selectedToDeactivate);
+  };
+
   const handleCreateStaff = async (e) => {
     e.preventDefault();
-    if (!newStaff.full_name || !newStaff.email) { toast.error('Please fill in all fields'); return; }
+    if (!newStaff.full_name || !newStaff.email) {
+      toast.error('Please fill in all fields');
+      return;
+    }
     setCreating(true);
     await createStaff.mutateAsync(newStaff);
     setCreating(false);
   };
 
+  /* Loading */
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-700" /></div>;
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-700" />
+      </div>
+    );
   }
 
   return (
@@ -76,26 +131,44 @@ const StaffManagement = () => {
         {/* Header */}
         <div className="flex justify-between items-center gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Staff Management</h1>
-          <button onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center px-3 sm:px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 shadow-sm text-sm">
-            <Plus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">New Staff</span>
+          <button
+            onClick={handleNewStaffClick}
+            className="inline-flex items-center px-3 sm:px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 shadow-sm text-sm"
+          >
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">New Staff</span>
           </button>
         </div>
+
+        {/* Limit warning banner */}
+        {limitReached && (
+          <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-xl text-sm text-amber-800">
+            <Info className="h-5 w-5 shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-semibold">Maximum of {MAX_STAFF} active staff accounts reached.</p>
+              <p className="text-xs mt-0.5">To add a new staff member, you must first deactivate one of the existing active accounts.</p>
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-          <input type="text" placeholder="Search by name or email…" value={searchQuery}
+          <input
+            type="search"
+            placeholder="Search by name or email…"
+            value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-forest-500 focus:border-forest-500 text-sm" />
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-forest-500 focus:border-forest-500 text-sm"
+          />
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'Total Staff', value: allStaff.length },
-            { label: 'Active',      value: allStaff.filter(s => s.is_active).length },
-            { label: 'Inactive',    value: allStaff.filter(s => !s.is_active).length },
+            { label: 'Total Staff',  value: allStaff.length },
+            { label: `Active (max ${MAX_STAFF})`, value: activeStaff.length },
+            { label: 'Inactive',     value: allStaff.filter(s => !s.is_active).length },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white rounded-lg shadow-sm p-3 sm:p-4 border border-gray-100">
               <p className="text-xs sm:text-sm text-gray-500">{label}</p>
@@ -128,15 +201,22 @@ const StaffManagement = () => {
                       <tr key={member.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{member.full_name}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{member.email}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{format(new Date(member.created_at), 'MMM dd, yyyy')}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{fmtDate(member.created_at)}</td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-medium ${member.is_active ? 'text-green-700' : 'text-gray-500'}`}>
                             {member.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <button onClick={() => toggleStatus.mutate(member.id)}
-                            className={`px-3 py-1 border text-xs rounded transition-colors ${member.is_active ? 'border-red-600 text-red-600 hover:bg-red-50' : 'border-emerald-700 text-emerald-700 hover:bg-forest-50'}`}>
+                          <button
+                            onClick={() => toggleStatus.mutate(member.id)}
+                            disabled={toggleStatus.isLoading}
+                            className={`px-3 py-1 border text-xs rounded transition-colors disabled:opacity-50 ${
+                              member.is_active
+                                ? 'border-red-600 text-red-600 hover:bg-red-50'
+                                : 'border-emerald-700 text-emerald-700 hover:bg-forest-50'
+                            }`}
+                          >
                             {member.is_active ? 'Deactivate' : 'Activate'}
                           </button>
                         </td>
@@ -158,11 +238,18 @@ const StaffManagement = () => {
                           {member.is_active ? 'Active' : 'Inactive'}
                         </span>
                         <span className="text-xs text-gray-300">·</span>
-                        <span className="text-xs text-gray-400">{format(new Date(member.created_at), 'MMM dd, yyyy')}</span>
+                        <span className="text-xs text-gray-400">{fmtDate(member.created_at)}</span>
                       </div>
                     </div>
-                    <button onClick={() => toggleStatus.mutate(member.id)}
-                      className={`shrink-0 px-3 py-1 border text-xs rounded ${member.is_active ? 'border-red-600 text-red-600 hover:bg-red-50' : 'border-emerald-700 text-emerald-700 hover:bg-forest-50'}`}>
+                    <button
+                      onClick={() => toggleStatus.mutate(member.id)}
+                      disabled={toggleStatus.isLoading}
+                      className={`shrink-0 px-3 py-1 border text-xs rounded disabled:opacity-50 ${
+                        member.is_active
+                          ? 'border-red-600 text-red-600 hover:bg-red-50'
+                          : 'border-emerald-700 text-emerald-700 hover:bg-forest-50'
+                      }`}
+                    >
                       {member.is_active ? 'Deactivate' : 'Activate'}
                     </button>
                   </div>
@@ -173,7 +260,7 @@ const StaffManagement = () => {
         </div>
       </div>
 
-      {/* Pagination — desktop only */}
+      {/* Pagination (desktop) */}
       {!isMobile && totalPages > 1 && (
         <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
@@ -195,6 +282,79 @@ const StaffManagement = () => {
         </div>
       )}
 
+      {/* Limit modal: pick who to deactivate */}
+      {showLimitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-2 text-amber-600">
+                  <AlertTriangle className="h-5 w-5 shrink-0" />
+                  <h3 className="text-lg font-bold text-gray-900">Staff Limit Reached</h3>
+                </div>
+                <button onClick={() => { setShowLimitModal(false); setSelectedToDeactivate(null); }}
+                  className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                Only <strong>{MAX_STAFF} active staff accounts</strong> are allowed. To add a new staff member,
+                select one of the following active accounts to deactivate first.
+              </p>
+
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Active Staff</p>
+              <div className="space-y-2 max-h-60 overflow-y-auto mb-5">
+                {activeStaff.map(s => (
+                  <label key={s.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedToDeactivate === s.id
+                        ? 'border-red-400 bg-red-50'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="deactivate-staff"
+                      value={s.id}
+                      checked={selectedToDeactivate === s.id}
+                      onChange={() => setSelectedToDeactivate(s.id)}
+                      className="h-4 w-4 text-red-600"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{s.full_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{s.email}</p>
+                    </div>
+                    <UserMinus className="h-4 w-4 text-red-400 shrink-0" />
+                  </label>
+                ))}
+              </div>
+
+              {selectedToDeactivate && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mb-4">
+                  <strong>Note:</strong> The selected staff member will be deactivated immediately.
+                  Their current session will be terminated on their next action.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => { setShowLimitModal(false); setSelectedToDeactivate(null); }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+                >Cancel</button>
+                <button
+                  onClick={handleDeactivateAndProceed}
+                  disabled={!selectedToDeactivate || toggleStatus.isLoading}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {toggleStatus.isLoading
+                    ? <><span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Processing…</>
+                    : <><UserMinus className="h-4 w-4" />Deactivate & Add New</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create staff modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -207,27 +367,52 @@ const StaffManagement = () => {
               </div>
               <form onSubmit={handleCreateStaff} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
-                  <input type="text" value={newStaff.full_name}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newStaff.full_name}
                     onChange={(e) => setNewStaff({ ...newStaff, full_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Juan Dela Cruz" required />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                    placeholder="Juan Dela Cruz"
+                    required
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address <span className="text-red-500">*</span></label>
-                  <input type="email" value={newStaff.email}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={newStaff.email}
                     onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="staff@example.com" required />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                    placeholder="staff@example.com"
+                    required
+                  />
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm font-medium text-blue-800">Auto-generated password</p>
-                  <p className="text-xs text-blue-600 mt-1">A random password will be generated and shown after creation.</p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    A random temporary password will be shown after creation.
+                    The staff member must change it on first login.
+                  </p>
                 </div>
                 <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
-                  <button type="button" onClick={() => { setShowCreateModal(false); setNewStaff({ full_name: '', email: '' }); }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">Cancel</button>
-                  <button type="submit" disabled={creating}
-                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 disabled:opacity-50 flex items-center gap-2 text-sm">
-                    {creating ? <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />Creating...</> : 'Create Account'}
+                  <button
+                    type="button"
+                    onClick={() => { setShowCreateModal(false); setNewStaff({ full_name: '', email: '' }); }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
+                  >Cancel</button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 disabled:opacity-50 flex items-center gap-2 text-sm"
+                  >
+                    {creating
+                      ? <><span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />Creating…</>
+                      : 'Create Account'}
                   </button>
                 </div>
               </form>

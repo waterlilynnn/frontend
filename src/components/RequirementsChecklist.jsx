@@ -1,12 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import API from '../config/api';
-import { CheckCircle2, Circle, ClipboardList, Loader2, FileCheck } from 'lucide-react';
+import { CheckCircle2, Circle, ClipboardList, Loader2, FileCheck, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const HaulerBadge = ({ haulerType }) => {
   if (!haulerType) return null;
   return (
-    <span className="inline-flex items-center gap-0.5 ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-600">
+    <span className="inline-flex items-center ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-600">
       {haulerType}
     </span>
   );
@@ -17,9 +17,7 @@ const ExemptedNotice = () => (
     <FileCheck className="h-4 w-4 text-forest-600 shrink-0" />
     <div>
       <p className="text-sm font-medium text-emerald-800">Exempted from Requirements</p>
-      <p className="text-xs text-forest-500 mt-0.5">
-        This business line does not require document submissions.
-      </p>
+      <p className="text-xs text-forest-500 mt-0.5">This business line does not require document submissions.</p>
     </div>
   </div>
 );
@@ -35,10 +33,7 @@ const RequirementsChecklist = ({ businessId, mode = 'view' }) => {
 
   const toggleMutation = useMutation({
     mutationFn: ({ submissionId, is_submitted, notes }) =>
-      API.patch(`/requirements/business/${businessId}/submission/${submissionId}`, {
-        is_submitted,
-        notes,
-      }),
+      API.patch(`/requirements/business/${businessId}/submission/${submissionId}`, { is_submitted, notes }),
     onSuccess: () => qc.invalidateQueries(['requirements', businessId]),
     onError:   () => toast.error('Failed to update requirement'),
   });
@@ -51,10 +46,7 @@ const RequirementsChecklist = ({ businessId, mode = 'view' }) => {
     );
   }
 
-  // Exempted business line
-  if (data?.is_exempted) {
-    return <ExemptedNotice />;
-  }
+  if (data?.is_exempted) return <ExemptedNotice />;
 
   if (!data || data.total === 0) {
     return (
@@ -69,28 +61,21 @@ const RequirementsChecklist = ({ businessId, mode = 'view' }) => {
   const allDone = submitted === total && total > 0;
   const pct     = total > 0 ? Math.round((submitted / total) * 100) : 0;
 
+  /* VIEW mode */
   if (mode === 'view') {
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium text-gray-700 flex items-center gap-1.5">
-            <ClipboardList className="h-4 w-4 text-emerald-700" />
-            Requirements
+            <ClipboardList className="h-4 w-4 text-emerald-700" />Requirements
           </span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-            allDone ? 'bg-forest-100 text-emerald-800' : 'bg-amber-100 text-amber-700'
-          }`}>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${allDone ? 'bg-forest-100 text-emerald-800' : 'bg-amber-100 text-amber-700'}`}>
             {submitted} / {total} submitted
           </span>
         </div>
-
         <div className="w-full bg-gray-100 rounded-full h-1.5">
-          <div
-            className={`h-1.5 rounded-full transition-all duration-500 ${allDone ? 'bg-forest-500' : 'bg-amber-400'}`}
-            style={{ width: `${pct}%` }}
-          />
+          <div className={`h-1.5 rounded-full transition-all duration-500 ${allDone ? 'bg-forest-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
         </div>
-
         <ul className="space-y-1.5">
           {items.map((item) => (
             <li key={item.id} className="flex items-center gap-2 text-sm">
@@ -99,9 +84,7 @@ const RequirementsChecklist = ({ businessId, mode = 'view' }) => {
                 : <Circle       className="h-4 w-4 text-gray-300 shrink-0"    />}
               <span className={item.is_submitted ? 'text-gray-700' : 'text-gray-400'}>
                 {item.label}
-                {item.is_required && !item.is_submitted && (
-                  <span className="ml-1 text-xs text-red-400">*required</span>
-                )}
+                {item.is_required && !item.is_submitted && <span className="ml-1 text-xs text-red-400">*required</span>}
                 <HaulerBadge haulerType={item.hauler_type} />
               </span>
             </li>
@@ -111,66 +94,71 @@ const RequirementsChecklist = ({ businessId, mode = 'view' }) => {
     );
   }
 
-  // Edit mode
+  /* EDIT mode */
+  const submittedItems   = items.filter(i => i.is_submitted);
+  const pendingItems     = items.filter(i => !i.is_submitted);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900 flex items-center gap-2 text-sm">
-          Requirements Checklist
-        </h3>
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-          allDone ? 'bg-forest-100 text-emerald-800' : 'bg-amber-100 text-amber-700'
-        }`}>
+        <h3 className="font-medium text-gray-900 text-sm">Requirements Checklist</h3>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${allDone ? 'bg-forest-100 text-emerald-800' : 'bg-amber-100 text-amber-700'}`}>
           {submitted} / {total}
         </span>
       </div>
 
       <div className="w-full bg-gray-100 rounded-full h-1.5">
-        <div
-          className={`h-1.5 rounded-full transition-all duration-500 ${allDone ? 'bg-forest-500' : 'bg-amber-400'}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-1.5 rounded-full transition-all duration-500 ${allDone ? 'bg-forest-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
       </div>
 
-      {items.length === 0 ? (
-        <p className="text-sm text-gray-400">No requirements for this hauler type.</p>
-      ) : (
-        <ul className="space-y-2">
-          {items.map((item) => (
-            <li key={item.id}>
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={item.is_submitted}
-                  onChange={() =>
-                    toggleMutation.mutate({
-                      submissionId: item.id,
-                      is_submitted: !item.is_submitted,
-                      notes: null,
-                    })
-                  }
-                  disabled={toggleMutation.isLoading}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-700
-                             focus:ring-forest-500 cursor-pointer"
-                />
-                <div>
-                  <span className={`text-sm transition-colors ${
-                    item.is_submitted
-                      ? 'text-gray-700 line-through decoration-forest-400'
-                      : 'text-gray-600 group-hover:text-gray-800'
-                  }`}>
-                    {item.label}
-                    {item.is_required && <span className="text-red-400 ml-0.5">*</span>}
-                  </span>
-                  {item.hauler_type && <HaulerBadge haulerType={item.hauler_type} />}
-                  {item.notes && (
-                    <p className="text-xs text-gray-400 mt-0.5">{item.notes}</p>
-                  )}
-                </div>
-              </label>
-            </li>
-          ))}
-        </ul>
+      {/* Submitted */}
+      {submittedItems.length > 0 && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <Lock className="h-3 w-3" /> Submitted ({submittedItems.length})
+          </p>
+          <ul className="space-y-1.5">
+            {submittedItems.map(item => (
+              <li key={item.id} className="flex items-center gap-2 text-sm text-gray-700">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>{item.label}</span>
+                <HaulerBadge haulerType={item.hauler_type} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Pending */}
+      {pendingItems.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pending ({pendingItems.length})</p>
+          <ul className="space-y-2">
+            {pendingItems.map(item => (
+              <li key={item.id}>
+                <label className="flex items-start gap-3 cursor-pointer group p-2 rounded-lg hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() =>
+                      toggleMutation.mutate({ submissionId: item.id, is_submitted: true, notes: null })
+                    }
+                    disabled={toggleMutation.isLoading}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-forest-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-sm text-gray-600 group-hover:text-gray-800">
+                      {item.label}
+                      {item.is_required && <span className="text-red-400 ml-0.5">*</span>}
+                    </span>
+                    <HaulerBadge haulerType={item.hauler_type} />
+                    {item.notes && <p className="text-xs text-gray-400 mt-0.5">{item.notes}</p>}
+                  </div>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {allDone && (

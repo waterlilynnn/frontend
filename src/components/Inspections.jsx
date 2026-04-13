@@ -16,9 +16,8 @@ const MONTHS = [
   'July','August','September','October','November','December',
 ];
 
-const StatusBadge = ({ inspections }) => {
-  if (!inspections || inspections.length === 0)
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500"><MinusCircle className="h-3 w-3" />Not Inspected</span>;
+const ResultBadge = ({ inspections }) => {
+  if (!inspections || inspections.length === 0) return null;
   const latest = inspections[0];
   if (latest.status === 'PASSED')
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium"><CheckCircle className="h-3 w-3" />Passed</span>;
@@ -152,7 +151,7 @@ const HistorySlideOver = ({ business, onClose }) => {
 };
 
 const Inspections = ({ rolePrefix = 'staff' }) => {
-  const qc = useQueryClient();
+  const qc       = useQueryClient();
   const isMobile = useIsMobile();
 
   const now = new Date();
@@ -176,6 +175,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
 
   const isLoading = bizLoading || inspLoading;
 
+  /* Map inspections by business id, sorted latest-first */
   const inspectionMap = useMemo(() => {
     const map = {};
     allInspections.forEach(i => {
@@ -200,9 +200,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
           const d = new Date(i.date);
           return d >= dateFrom && d <= dateTo;
         });
-        if (filterStatus === 'inspected' && !inPeriod) return false;
-        if (filterStatus === 'violation'  && !inPeriod) return false;
-        if (filterStatus === 'passed'     && !inPeriod) return false;
+        if (['inspected', 'violation', 'passed'].includes(filterStatus) && !inPeriod) return false;
       }
 
       if (filterStatus === 'inspected'     && inspections.length === 0) return false;
@@ -217,11 +215,11 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
       }
 
       if (filterStatus === 'passed') {
-        const hasPassedInPeriod = inspections.some(i =>
-          i.status === 'PASSED' &&
-          i.date && new Date(i.date) >= dateFrom && new Date(i.date) <= dateTo
+        const hasPassed = inspections.some(i =>
+          i.status === 'PASSED' && i.date &&
+          new Date(i.date) >= dateFrom && new Date(i.date) <= dateTo
         );
-        if (!hasPassedInPeriod) return false;
+        if (!hasPassed) return false;
       }
 
       if (search) {
@@ -239,9 +237,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
 
   const PER_PAGE   = 10;
   const totalPages = Math.ceil(filtered.length / PER_PAGE);
-
-  // Desktop = paginated slice, Mobile = all
-  const paginated = isMobile
+  const paginated  = isMobile
     ? filtered
     : filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
@@ -267,7 +263,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
       const lastRaw       = res.data.last_inspection_date;
       const lastFormatted = lastRaw ? format(new Date(lastRaw), 'MMMM dd, yyyy') : null;
       const msg = lastFormatted
-        ? `This business was already inspected on ${lastFormatted}. Maximum of ${maxCount} inspection(s) per ${period} reached.`
+        ? `Already inspected on ${lastFormatted}. Max ${maxCount} inspection(s) per ${period}.`
         : `Maximum ${maxCount} inspection(s) per ${period} reached.`;
       toast.error(msg);
     } catch { toast.error('Failed to check inspection eligibility'); }
@@ -284,10 +280,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
         />
       )}
       {historyBusiness && (
-        <HistorySlideOver
-          business={historyBusiness}
-          onClose={() => setHistoryBusiness(null)}
-        />
+        <HistorySlideOver business={historyBusiness} onClose={() => setHistoryBusiness(null)} />
       )}
 
       <div className="pb-6 lg:pb-28 space-y-4">
@@ -296,10 +289,10 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
         {/* Stats */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex flex-wrap gap-6 text-sm">
-            <div><span className="text-gray-500">Total:</span>          <span className="font-semibold text-gray-800 ml-1">{stats.total}</span></div>
-            <div><span className="text-gray-500">Inspected:</span>      <span className="font-semibold text-emerald-700 ml-1">{stats.inspected}</span></div>
-            <div><span className="text-gray-500">Not Inspected:</span>  <span className="font-semibold text-amber-600 ml-1">{stats.notInspected}</span></div>
-            <div><span className="text-gray-500">With Violations:</span><span className="font-semibold text-red-600 ml-1">{stats.violations}</span></div>
+            <div><span className="text-gray-500">Total:</span>           <span className="font-semibold text-gray-800 ml-1">{stats.total}</span></div>
+            <div><span className="text-gray-500">Inspected:</span>       <span className="font-semibold text-emerald-700 ml-1">{stats.inspected}</span></div>
+            <div><span className="text-gray-500">Not Inspected:</span>   <span className="font-semibold text-amber-600 ml-1">{stats.notInspected}</span></div>
+            <div><span className="text-gray-500">With Violations:</span> <span className="font-semibold text-red-600 ml-1">{stats.violations}</span></div>
           </div>
         </div>
 
@@ -310,23 +303,21 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
             <span className="text-sm font-medium text-gray-700">Filter by:</span>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => { setSelYear(prev => prev - 1); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={() => { setSelYear(p => p - 1); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-sm font-semibold text-gray-800 min-w-[80px] text-center">{selYear}</span>
-              <button onClick={() => { setSelYear(prev => prev + 1); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded">
+              <button onClick={() => { setSelYear(p => p + 1); setCurrentPage(1); }} className="p-1 hover:bg-gray-100 rounded">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
 
-            <select value={selMonth}
-              onChange={e => { setSelMonth(Number(e.target.value)); setCurrentPage(1); }}
+            <select value={selMonth} onChange={e => { setSelMonth(Number(e.target.value)); setCurrentPage(1); }}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
               {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
             </select>
 
-            <select value={filterStatus}
-              onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
+            <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
               className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
               <option value="all">All Businesses</option>
               <option value="inspected">Inspected</option>
@@ -338,7 +329,8 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-2 h-4 w-4 text-gray-400" />
               <input
-                type="text"
+                type="search"
+                inputMode="search"
                 placeholder="Search business name or control #…"
                 value={search}
                 onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
@@ -362,44 +354,93 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
           ) : paginated.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">No businesses match the current filters</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Hauler</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {paginated.map(b => {
-                    const inspections = inspectionMap[b.id] || [];
-                    return (
-                      <tr key={b.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-3">
-                          <div className="text-sm font-medium text-gray-900">{b.establishment_name}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">BIN: {b.bin_number || '—'}</div>
-                        </td>
-                        <td className="px-5 py-3 text-sm text-gray-600">{b.hauler_type || '—'}</td>
-                        <td className="px-5 py-3">
-                          <button onClick={() => setHistoryBusiness(b)} className="hover:opacity-70 transition-opacity">
-                            <StatusBadge inspections={inspections} />
-                          </button>
-                        </td>
-                        <td className="px-5 py-3 whitespace-nowrap">
-                          <button
-                            onClick={() => checkCanInspect(b.id, b)}
-                            className="px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50 transition-colors">
-                            Inspect
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-100">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Hauler</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Latest Result</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {paginated.map(b => {
+                      const inspections = inspectionMap[b.id] || [];
+                      const isInspected = inspections.length > 0;
+                      return (
+                        <tr key={b.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-5 py-3">
+                            <div className="text-sm font-medium text-gray-900">{b.establishment_name}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">BIN: {b.bin_number || '—'}</div>
+                          </td>
+                          <td className="px-5 py-3 text-sm text-gray-600">{b.hauler_type || '—'}</td>
+                          {/* Status */}
+                          <td className="px-5 py-3">
+                            {isInspected
+                              ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 font-medium"><CheckCircle className="h-3 w-3" />Inspected</span>
+                              : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500"><MinusCircle className="h-3 w-3" />Not Yet Inspected</span>}
+                          </td>
+                          {/* Latest result — clickable to open history */}
+                          <td className="px-5 py-3">
+                            <button onClick={() => setHistoryBusiness(b)} className="hover:opacity-70">
+                              <ResultBadge inspections={inspections} />
+                            </button>
+                            {!isInspected && <span className="text-xs text-gray-300">—</span>}
+                          </td>
+                          <td className="px-5 py-3 whitespace-nowrap">
+                            <button
+                              onClick={() => checkCanInspect(b.id, b)}
+                              className="px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50 transition-colors"
+                            >
+                              Inspect
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {paginated.map(b => {
+                  const inspections = inspectionMap[b.id] || [];
+                  const isInspected = inspections.length > 0;
+                  return (
+                    <div key={b.id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{b.establishment_name}</p>
+                          <p className="text-xs text-gray-400">BIN: {b.bin_number || '—'} · {b.hauler_type || '—'}</p>
+                        </div>
+                        {/* Status badge */}
+                        {isInspected
+                          ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 font-medium shrink-0"><CheckCircle className="h-3 w-3" />Inspected</span>
+                          : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500 shrink-0"><MinusCircle className="h-3 w-3" />Not Yet</span>}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        {/* Latest result */}
+                        <button onClick={() => isInspected && setHistoryBusiness(b)}>
+                          <ResultBadge inspections={inspections} />
+                        </button>
+                        <button
+                          onClick={() => checkCanInspect(b.id, b)}
+                          className="px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50"
+                        >
+                          Inspect
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -34,11 +34,12 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
   const [showForm, setShowForm]       = useState(false);
   const [formData, setFormData]       = useState(EMPTY_FORM);
 
-  // Always fetch all data — pagination for desktop
+  const SEARCH_MIN = 1;
+
   const { data: allBusinesses, isLoading, refetch } = useQuery({
     queryKey: ['businessRecords', searchQuery],
     queryFn: async () => {
-      if (searchQuery.length >= 2) {
+      if (searchQuery.length >= SEARCH_MIN) {
         const res = await API.get(
           `/business-records/search?q=${encodeURIComponent(searchQuery)}&per_page=1000`
         );
@@ -83,14 +84,13 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
   const totalCount = allItems.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE);
 
-  // Desktop = paginated slice, Mobile = all
   const businesses = isMobile
     ? allItems
     : allItems.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const handleSubmit      = (e) => { e.preventDefault(); createMutation.mutate(formData); };
   const handleFieldChange = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
-  const handleSearchChange = (value) => { setSearchQuery(value); setCurrentPage(1); };
+  const handleSearch      = (value) => { setSearchQuery(value); setCurrentPage(1); };
 
   const formatDate = (dateString) => {
     if (!dateString) return '—';
@@ -120,13 +120,12 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
     <div className="min-h-screen bg-gray-50">
       <div className="pb-6 lg:pb-28 space-y-4">
 
-        {/* Header row */}
+        {/* Header */}
         <div className="flex justify-between items-center gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Business Records</h1>
           <button
             onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-700 text-white
-                       rounded-lg hover:bg-emerald-800 shadow-sm transition-all text-sm whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 shadow-sm transition-all text-sm whitespace-nowrap"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">New Business</span>
@@ -138,22 +137,25 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           <input
-            type="text"
+            type="search"
+            inputMode="search"
+            enterKeyHint="search"
             placeholder="Search by name, owner, or BIN…"
             value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg
-                       focus:ring-forest-500 focus:border-forest-500 text-sm"
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-forest-500 focus:border-forest-500 text-sm"
           />
           {searchQuery && (
-            <button onClick={() => handleSearchChange('')}
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+            <button
+              onClick={() => handleSearch('')}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+            >
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        {searchQuery.length >= 2 && !isLoading && (
+        {searchQuery.length >= SEARCH_MIN && !isLoading && (
           <p className="text-xs text-gray-500">
             <span className="bg-gray-100 px-2 py-0.5 rounded-full font-medium">
               {totalCount} result{totalCount !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
@@ -193,7 +195,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
             </div>
           ) : businesses.length === 0 ? (
             <div className="text-center py-12 text-gray-500 text-sm">
-              {searchQuery.length >= 2 ? `No results found for "${searchQuery}"` : 'No business records found'}
+              {searchQuery.length >= SEARCH_MIN ? `No results for "${searchQuery}"` : 'No business records found'}
             </div>
           ) : (
             <>
@@ -203,9 +205,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                   <thead className="bg-gray-50">
                     <tr>
                       {['Date Applied', 'Business Name', 'Business Line', 'Business Owner', 'Type', 'Action'].map(col => (
-                        <th key={col} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          {col}
-                        </th>
+                        <th key={col} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{col}</th>
                       ))}
                     </tr>
                   </thead>
@@ -223,10 +223,8 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                         <td className="px-6 py-4 text-sm text-gray-600">{formatOwnerName(business)}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{business.application_type || 'NEW'}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => navigate(`/${rolePrefix}/business/${business.id}`)}
-                            className="px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50"
-                          >
+                          <button onClick={() => navigate(`/${rolePrefix}/business/${business.id}`)}
+                            className="px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50">
                             View
                           </button>
                         </td>
@@ -253,10 +251,8 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => navigate(`/${rolePrefix}/business/${business.id}`)}
-                        className="shrink-0 px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50"
-                      >
+                      <button onClick={() => navigate(`/${rolePrefix}/business/${business.id}`)}
+                        className="shrink-0 px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50">
                         View
                       </button>
                     </div>
@@ -277,22 +273,12 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
               <span className="text-gray-400 ml-2">({totalCount} records)</span>
             </span>
             <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
+              <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Previous
               </button>
-              <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${
-                  currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'
-                }`}
-              >
+              <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}>
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </button>
             </div>
