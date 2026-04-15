@@ -41,8 +41,9 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
   const [viewingClearanceId, setViewingClearanceId] = useState(null);
   const [viewingControlNumber, setViewingControlNumber] = useState('');
   const [generateError, setGenerateError]           = useState('');
+  const [showHistoryBusiness, setShowHistoryBusiness] = useState(null);
 
-  // Fetch all businesses + clearances — pagination for desktop
+  // Fetch all businesses + clearances
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['clearanceBusinesses', searchQuery],
     queryFn: async () => {
@@ -80,6 +81,17 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
 
       return { items, total: items.length };
     },
+  });
+
+  // Fetch inspections for history modal
+  const { data: inspections = [] } = useQuery({
+    queryKey: ['businessInspectionsHistory', showHistoryBusiness?.id],
+    queryFn: async () => {
+      if (!showHistoryBusiness?.id) return [];
+      const res = await API.get(`/inspections/business/${showHistoryBusiness.id}`);
+      return res.data;
+    },
+    enabled: !!showHistoryBusiness?.id,
   });
 
   const generateMutation = useMutation({
@@ -148,11 +160,7 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
   const allItems   = data?.items || [];
   const totalCount = allItems.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE);
-
-  // Desktop = paginated slice, Mobile = all
-  const items = isMobile
-    ? allItems
-    : allItems.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const items = isMobile ? allItems : allItems.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const StatusChip = ({ item }) => {
     if (item.is_claimed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><CheckCircle className="h-3 w-3" />Issued</span>;
@@ -184,8 +192,70 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
     )
   );
 
+  // Inspection History Modal Component
+  const HistoryModal = ({ business, onClose }) => {
+    const fmtDt = (d) => {
+      try { return format(new Date(d), 'MMM dd, yyyy hh:mm a'); }
+      catch { return '—'; }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Inspection History</h2>
+              <p className="text-sm text-gray-500">{business?.establishment_name}</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+            {inspections.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">No inspection records found</div>
+            ) : (
+              inspections.map(insp => (
+                <div key={insp.id} className={`border rounded-lg p-4 ${
+                  insp.status === 'WITH VIOLATION' && !insp.is_resolved ? 'border-red-200 bg-red-50' :
+                  insp.is_resolved ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-500">{fmtDt(insp.date)}</span>
+                    {insp.status === 'WITH VIOLATION' && !insp.is_resolved ? (
+                      <span className="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">With Violation</span>
+                    ) : insp.is_resolved ? (
+                      <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Resolved</span>
+                    ) : (
+                      <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Passed</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700">{insp.remarks || 'No remarks'}</p>
+                  {insp.is_resolved && (
+                    <div className="mt-2 text-xs text-blue-600">
+                      Resolved by {insp.resolved_by} on {fmtDt(insp.resolved_at)}
+                      {insp.resolved_remarks && <p className="mt-0.5">Note: {insp.resolved_remarks}</p>}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <button onClick={onClose} className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* History Modal */}
+      {showHistoryBusiness && (
+        <HistoryModal business={showHistoryBusiness} onClose={() => setShowHistoryBusiness(null)} />
+      )}
+
       {/* Generate modal */}
       {showGenerateModal && selectedBusiness && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -261,14 +331,7 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
         </div>
       )}
 
-      {showViewer && pdfUrl && (
-        <PDFViewer
-          url={pdfUrl}
-          title={viewingControlNumber || 'Clearance Document'}  
-          onClose={closeViewer}
-          onDownload={handleDownload}
-        />
-      )}
+      {showViewer && pdfUrl && <PDFViewer url={pdfUrl} onClose={closeViewer} onDownload={handleDownload} />}
 
       <div className="pb-6 lg:pb-28 space-y-4">
         <div className="flex justify-between items-center">
@@ -315,9 +378,13 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
                           <div className="text-sm font-medium text-gray-900">{item.establishment_name}</div>
                           <div className="text-xs text-gray-500 mt-0.5">Control #: {item.control_number || '—'}</div>
                           {item.has_violation && (
-                            <div className="flex items-center text-xs text-red-600 mt-1">
-                              <AlertTriangle className="h-3 w-3 mr-1" />Violation: {item.violation_details}
-                            </div>
+                            <button
+                              onClick={() => setShowHistoryBusiness(item)}
+                              className="flex items-center text-xs text-red-600 hover:text-red-800 hover:underline mt-1"
+                            >
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              With Violation
+                            </button>
                           )}
                         </td>
                         <td className="px-6 py-4">
@@ -341,9 +408,13 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
                         <p className="text-sm font-semibold text-gray-900 truncate">{item.establishment_name}</p>
                         <p className="text-xs text-gray-500 mt-0.5">Control #: {item.control_number || '—'}</p>
                         {item.has_violation && (
-                          <p className="flex items-center text-xs text-red-600 mt-1">
-                            <AlertTriangle className="h-3 w-3 mr-1 shrink-0" />{item.violation_details}
-                          </p>
+                          <button
+                            onClick={() => setShowHistoryBusiness(item)}
+                            className="flex items-center text-xs text-red-600 hover:text-red-800 hover:underline mt-1"
+                          >
+                            <AlertTriangle className="h-3 w-3 mr-1 shrink-0" />
+                            With Violation
+                          </button>
                         )}
                       </div>
                       <StatusChip item={item} />

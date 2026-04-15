@@ -111,7 +111,7 @@ const BusinessDetails = ({ backPath = '/staff/business' }) => {
   const LBL = 'block text-sm font-medium text-gray-700 mb-1';
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4 pb-24">
+    <div className="max-w-6xl mx-auto space-y-4 pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <button onClick={() => navigate(backPath)} className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm">

@@ -363,22 +363,25 @@ const BusinessLinesTab = () => {
   const qc = useQueryClient();
   const [lines, setLines]             = useState([]);
   const [newLine, setNewLine]         = useState('');
-  const [exempted, setExempted]       = useState([]);
+  const [exemptedRequirements, setExemptedRequirements] = useState([]);
+  const [exemptedInspections, setExemptedInspections] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState('');
-  const [editingLine, setEditingLine] = useState(null);
+  const [editingId, setEditingId]     = useState(null);
   const [editDraft, setEditDraft]     = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const [lRes, eRes] = await Promise.all([
+        const [lRes, reqRes, inspRes] = await Promise.all([
           API.get('/admin/settings/business-lines'),
           API.get('/admin/settings/exempted-lines'),
+          API.get('/admin/settings/exempted-inspection-lines'),
         ]);
         setLines((lRes.data.business_lines || []).sort((a, b) => a.localeCompare(b)));
-        setExempted(eRes.data.exempted_lines || []);
+        setExemptedRequirements(reqRes.data.exempted_lines || []);
+        setExemptedInspections(inspRes.data.exempted_inspection_lines || []);
       } catch {}
       finally { setLoading(false); }
     })();
@@ -393,17 +396,50 @@ const BusinessLinesTab = () => {
     setNewLine('');
   };
 
-  const saveLine = () => {
+  const startEdit = (line) => {
+    setEditingId(line);
+    setEditDraft(line);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const saveEdit = () => {
     const trimmed = editDraft.trim();
     if (!trimmed) return;
-    if (trimmed !== editingLine && lines.some(l => l.toLowerCase() === trimmed.toLowerCase())) {
+    if (trimmed !== editingId && lines.some(l => l.toLowerCase() === trimmed.toLowerCase())) {
       toast.error('A business line with that name already exists');
       return;
     }
-    setLines(lines.map(l => l === editingLine ? trimmed : l).sort((a, b) => a.localeCompare(b)));
-    setExempted(ex => ex.map(e => e === editingLine ? trimmed : e));
-    setEditingLine(null);
+    
+    // Update line name in all arrays
+    const updatedLines = lines.map(l => l === editingId ? trimmed : l).sort((a, b) => a.localeCompare(b));
+    setLines(updatedLines);
+    
+    // Update exempted lists if the old name was in them
+    if (exemptedRequirements.includes(editingId)) {
+      setExemptedRequirements(prev => [...prev.filter(e => e !== editingId), trimmed]);
+    }
+    if (exemptedInspections.includes(editingId)) {
+      setExemptedInspections(prev => [...prev.filter(e => e !== editingId), trimmed]);
+    }
+    
+    setEditingId(null);
     setEditDraft('');
+  };
+
+  const toggleExemptRequirement = (line) => {
+    setExemptedRequirements(prev =>
+      prev.includes(line) ? prev.filter(e => e !== line) : [...prev, line]
+    );
+  };
+
+  const toggleExemptInspection = (line) => {
+    setExemptedInspections(prev =>
+      prev.includes(line) ? prev.filter(e => e !== line) : [...prev, line]
+    );
   };
 
   const saveChanges = async () => {
@@ -411,7 +447,8 @@ const BusinessLinesTab = () => {
     try {
       await Promise.all([
         API.put('/admin/settings/business-lines', { business_lines: lines }),
-        API.put('/admin/settings/exempted-lines', { exempted_lines: exempted }),
+        API.put('/admin/settings/exempted-lines', { exempted_lines: exemptedRequirements }),
+        API.put('/admin/settings/exempted-inspection-lines', { exempted_inspection_lines: exemptedInspections }),
       ]);
       toast.success('Business lines saved');
       qc.invalidateQueries(['options']);
@@ -423,79 +460,135 @@ const BusinessLinesTab = () => {
   if (loading) return <div className="flex justify-center py-12"><div className="animate-spin h-8 w-8 border-b-2 border-emerald-700 rounded-full" /></div>;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Add new line */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2">
         <input
           type="text"
           value={newLine}
           onChange={(e) => { setNewLine(e.target.value); setError(''); }}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addLine())}
           placeholder="Add new business line…"
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-forest-500"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
         />
-        <button onClick={addLine} className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">Add</button>
+        <button onClick={addLine} className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">
+          Add
+        </button>
       </div>
 
-      {error && <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
+      {error && <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{error}</div>}
 
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {lines.map(line => (
-          <div key={line} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            {editingLine === line ? (
-              /* Inline edit mode */
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  autoFocus
-                  value={editDraft}
-                  onChange={e => setEditDraft(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') saveLine();
-                    if (e.key === 'Escape') setEditingLine(null);
-                  }}
-                  className="flex-1 px-2 py-1 border border-emerald-400 rounded text-sm focus:outline-none"
-                />
-                <button onClick={saveLine} className="px-2 py-1 bg-emerald-700 text-white rounded text-xs hover:bg-emerald-800">Save</button>
-                <button onClick={() => setEditingLine(null)} className="px-2 py-1 border border-gray-300 rounded text-xs hover:bg-gray-100">Cancel</button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <input
-                    type="checkbox"
-                    checked={exempted.includes(line)}
-                    onChange={() => setExempted(prev => prev.includes(line) ? prev.filter(e => e !== line) : [...prev, line])}
-                    className="h-4 w-4 text-emerald-700 rounded"
-                    title="Exempt from requirements"
-                  />
-                  <span className="text-sm text-gray-700 truncate">{line}</span>
-                  {exempted.includes(line) && (
-                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full shrink-0">Exempted</span>
+      {/* Business lines table */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-100">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Business Line</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider w-32">Exempt from Requirements</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider w-32">Exempt from Inspections</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider w-20">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {lines.map(line => (
+              <tr key={line} className="hover:bg-gray-50">
+                <td className="px-4 py-2.5">
+                  {editingId === line ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        value={editDraft}
+                        onChange={e => setEditDraft(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') saveEdit();
+                          if (e.key === 'Escape') cancelEdit();
+                        }}
+                        className="flex-1 px-2 py-1 border border-emerald-400 rounded text-sm focus:outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-800">{line}</span>
                   )}
-                </div>
-                {/* Edit button */}
-                <button
-                  onClick={() => { setEditingLine(line); setEditDraft(line); }}
-                  className="shrink-0 ml-2 p-1.5 text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
-                  title="Edit business line"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  {editingId === line ? (
+                    <input
+                      type="checkbox"
+                      checked={exemptedRequirements.includes(editDraft)}
+                      onChange={() => {
+                        if (exemptedRequirements.includes(editDraft)) {
+                          setExemptedRequirements(prev => prev.filter(e => e !== editDraft));
+                        } else {
+                          setExemptedRequirements(prev => [...prev, editDraft]);
+                        }
+                      }}
+                      className="h-4 w-4 text-emerald-700 rounded mx-auto"
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={exemptedRequirements.includes(line)}
+                      onChange={() => toggleExemptRequirement(line)}
+                      className="h-4 w-4 text-emerald-700 rounded mx-auto cursor-pointer"
+                    />
+                  )}
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  {editingId === line ? (
+                    <input
+                      type="checkbox"
+                      checked={exemptedInspections.includes(editDraft)}
+                      onChange={() => {
+                        if (exemptedInspections.includes(editDraft)) {
+                          setExemptedInspections(prev => prev.filter(e => e !== editDraft));
+                        } else {
+                          setExemptedInspections(prev => [...prev, editDraft]);
+                        }
+                      }}
+                      className="h-4 w-4 text-emerald-700 rounded mx-auto"
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      checked={exemptedInspections.includes(line)}
+                      onChange={() => toggleExemptInspection(line)}
+                      className="h-4 w-4 text-emerald-700 rounded mx-auto cursor-pointer"
+                    />
+                  )}
+                </td>
+                <td className="px-4 py-2.5 text-center">
+                  {editingId === line ? (
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={saveEdit} className="p-1 text-emerald-700 hover:text-emerald-800" title="Save">
+                        <Save className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={cancelEdit} className="p-1 text-gray-400 hover:text-gray-600" title="Cancel">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => startEdit(line)} className="p-1 text-gray-400 hover:text-emerald-700" title="Edit">
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {exempted.length > 0 && (
-        <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-700 border border-amber-100">
-          <strong>Note:</strong> Exempted business lines skip the requirements checklist.
-        </div>
-      )}
+      {/* Legend */}
+      <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
+        <p><span className="inline-block w-3 h-3 bg-emerald-700 rounded mr-1"></span> <strong>Exempt from Requirements</strong> — Business line does not require document submissions</p>
+        <p><span className="inline-block w-3 h-3 bg-amber-600 rounded mr-1"></span> <strong>Exempt from Inspections</strong> — Business line does not require inspections</p>
+      </div>
 
+      {/* Save button */}
       <div className="flex justify-end pt-4 border-t border-gray-200">
         <button onClick={saveChanges} disabled={saving}
-          className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50">
+          className="px-5 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800 disabled:opacity-50 flex items-center gap-2">
+          {saving && <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           {saving ? 'Saving…' : 'Save Changes'}
         </button>
       </div>
@@ -1105,7 +1198,6 @@ const TABS = [
   { key: 'signatories',    label: 'Signatories'           },
   { key: 'archive',        label: 'Archive'               },
   { key: 'adminAccount',   label: 'Admin Account'         },
-  { key: 'inspectionFreq', label: 'Inspection Frequency'  },
 ];
 
 const AdminSettings = () => {
@@ -1137,7 +1229,6 @@ const AdminSettings = () => {
         {tab === 'signatories'    && <SignatoriesTab />}
         {tab === 'archive'        && <ArchiveTab />}
         {tab === 'adminAccount'   && <AdminAccountTab />}
-        {tab === 'inspectionFreq' && <InspectionFrequencyTab />}
       </div>
     </div>
   );

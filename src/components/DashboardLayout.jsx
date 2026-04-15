@@ -121,12 +121,13 @@ const DashboardLayout = ({ role = 'staff' }) => {
   const routePrefix = `/${role}`;
 
   const stats = useMemo(() => {
+    const activeStaffCount = staffList.filter(s => s.is_active).length;
     const base = [
       { label: 'Total Businesses',  value: allBiz.length,                               href: `${routePrefix}/business`,    Icon: Building2,     bg: 'bg-blue-50',    border: 'border-blue-200',    text: 'text-blue-700' },
       { label: 'Issued Clearances', value: clrHistory.filter(c => c.is_claimed).length,  href: `${routePrefix}/clearance`,   Icon: File,          bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-[#0f6e53]' },
       { label: 'With Violations',   value: allBiz.filter(b => b.has_violation).length,   href: `${routePrefix}/inspections`, Icon: AlertTriangle, bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-700' },
     ];
-    if (role === 'admin') base.splice(1, 0, { label: 'Staff Members', value: staffList.length, href: '/admin/staff', Icon: Users, bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700' });
+    if (role === 'admin') base.splice(1, 0, { label: 'Active Staff', value: activeStaffCount, href: '/admin/staff', Icon: Users, bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700' });
     return base;
   }, [allBiz, clrHistory, staffList, routePrefix]);
 
