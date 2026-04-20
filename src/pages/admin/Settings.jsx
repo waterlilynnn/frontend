@@ -9,6 +9,7 @@ import {
   Archive, ArchiveRestore,
   UserPlus, ShieldCheck, Mail,
   CheckCircle, Info, Shield, UserCog,
+  FileText, Calendar, AlertTriangle, RotateCcw
 } from 'lucide-react';
 
 const HAULER_TYPES_REQ = ['City', 'Barangay', 'Accredited', 'Hazardous'];
@@ -782,69 +783,160 @@ const SignatoriesTab = () => {
 
 
 // ARCHIVE TAB
+// ARCHIVE TAB (CLEARANCES ONLY)
 const ArchiveTab = () => {
   const qc = useQueryClient();
   const [confirmYear, setConfirmYear] = useState(null);
-  const [action, setAction]           = useState(null);
+  const [action, setAction] = useState(null);
 
   const { data: years = [], isLoading, refetch } = useQuery({
     queryKey: ['archiveYears'],
-    queryFn: async () => (await API.get('/admin/settings/archive/years')).data,
+    queryFn: async () => {
+      try {
+        const res = await API.get('/admin/settings/archive/years');
+        // Ensure we always return an array
+        return Array.isArray(res.data) ? res.data : [];
+      } catch (error) {
+        console.error('Failed to fetch archive years:', error);
+        return [];
+      }
+    },
+  });
+
+  // Get current sticker year for info
+  const { data: stickerInfo } = useQuery({
+    queryKey: ['stickerYear'],
+    queryFn: async () => {
+      try {
+        const res = await API.get('/admin/settings/sticker-year');
+        return res.data || { sticker_year: new Date().getFullYear(), cutoff_month: 11 };
+      } catch (error) {
+        return { sticker_year: new Date().getFullYear(), cutoff_month: 11 };
+      }
+    },
   });
 
   const archiveMutation = useMutation({
     mutationFn: (year) => API.post(`/admin/settings/archive/${year}`),
-    onSuccess: (res) => { toast.success(res.data.message); setConfirmYear(null); refetch(); },
-    onError:   (e)   => toast.error(e.response?.data?.detail || 'Archive failed'),
-  });
-  const unarchiveMutation = useMutation({
-    mutationFn: (year) => API.post(`/admin/settings/unarchive/${year}`),
-    onSuccess: (res) => { toast.success(res.data.message); setConfirmYear(null); refetch(); },
-    onError:   (e)   => toast.error(e.response?.data?.detail || 'Restore failed'),
+    onSuccess: (res) => {
+      toast.success(res.data.message || `Archived clearances from ${confirmYear}`);
+      setConfirmYear(null);
+      refetch();
+      qc.invalidateQueries(['allClrAdminDash']);
+    },
+    onError: (e) => {
+      toast.error(e.response?.data?.detail || 'Archive failed');
+    },
   });
 
-  if (isLoading) return <div className="flex justify-center py-12"><div className="animate-spin h-8 w-8 border-b-2 border-emerald-700 rounded-full" /></div>;
+  const unarchiveMutation = useMutation({
+    mutationFn: (year) => API.post(`/admin/settings/unarchive/${year}`),
+    onSuccess: (res) => {
+      toast.success(res.data.message || `Restored clearances from ${confirmYear}`);
+      setConfirmYear(null);
+      refetch();
+      qc.invalidateQueries(['allClrAdminDash']);
+    },
+    onError: (e) => {
+      toast.error(e.response?.data?.detail || 'Restore failed');
+    },
+  });
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin h-8 w-8 border-b-2 border-emerald-700 rounded-full" />
+      </div>
+    );
+  }
+
+  // Safe check for years array
+  const safeYears = Array.isArray(years) ? years : [];
 
   return (
     <div className="space-y-4">
-      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-        <p className="font-semibold mb-1">About archiving</p>
-        <p className="text-xs leading-relaxed">
-          Archiving hides past-year business records from the main list. Records are <strong>not deleted</strong> — they can be restored at any time.
-        </p>
+      {/* Info Banner */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+        <div className="flex items-start gap-3">
+          <FileText className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-blue-800 mb-1">About Clearance Archiving</p>
+            <p className="text-xs text-blue-700 leading-relaxed">
+              This section archives <strong>clearances only</strong> — business records remain active and editable.
+              Archived clearances are hidden from the main clearance list but can be restored at any time.
+            </p>
+          </div>
+        </div>
       </div>
-      {years.length === 0 ? (
-        <div className="text-center py-12 text-gray-400 text-sm">No past-year records found.</div>
+
+      {safeYears.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
+          <Archive className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">No clearances found</p>
+          <p className="text-xs text-gray-400 mt-1">Clearances will appear here once generated</p>
+        </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
-                {['Year', 'Records', 'Status', 'Action'].map(col => (
-                  <th key={col} className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase">{col}</th>
-                ))}
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Year</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Clearances</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {years.map(item => (
-                <tr key={item.year} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-semibold text-gray-800">{item.year}</td>
-                  <td className="px-5 py-3 text-sm text-gray-600">{item.record_count.toLocaleString()} records</td>
-                  <td className="px-5 py-3">
-                    {item.already_archived
-                      ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600"><Archive className="h-3 w-3" />Archived</span>
-                      : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>}
+              {safeYears.map((item) => (
+                <tr key={item.year} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-4">
+                    <span className="font-semibold text-gray-800 text-lg">{item.year}</span>
+                    {item.year === currentYear && (
+                      <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Current</span>
+                    )}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-4">
+                    <span className="text-sm text-gray-600">
+                      {(item.clearance_count || 0).toLocaleString()} clearance(s)
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
                     {item.already_archived ? (
-                      <button onClick={() => { setConfirmYear(item.year); setAction('unarchive'); }}
-                        className="inline-flex items-center gap-1 px-3 py-1 border border-emerald-700 text-emerald-700 text-xs rounded hover:bg-forest-50">
-                        <ArchiveRestore className="h-3.5 w-3.5" />Restore
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                        <Archive className="h-3 w-3" />
+                        Archived
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                        Active
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4">
+                    {item.already_archived ? (
+                      <button
+                        onClick={() => { setConfirmYear(item.year); setAction('unarchive'); }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-700 text-emerald-700 text-xs rounded-lg hover:bg-emerald-50 transition-colors"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Restore
                       </button>
                     ) : (
-                      <button onClick={() => { setConfirmYear(item.year); setAction('archive'); }}
-                        className="inline-flex items-center gap-1 px-3 py-1 border border-amber-600 text-amber-600 text-xs rounded hover:bg-amber-50">
-                        <Archive className="h-3.5 w-3.5" />Archive
+                      <button
+                        onClick={() => { setConfirmYear(item.year); setAction('archive'); }}
+                        disabled={item.year === currentYear}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                          item.year === currentYear
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'border border-amber-600 text-amber-600 hover:bg-amber-50'
+                        }`}
+                        title={item.year === currentYear ? "Cannot archive current year clearances" : ""}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                        Archive
                       </button>
                     )}
                   </td>
@@ -854,25 +946,58 @@ const ArchiveTab = () => {
           </table>
         </div>
       )}
+
+      {/* Confirmation Modal */}
       {confirmYear && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              {action === 'archive' ? `Archive ${confirmYear} records?` : `Restore ${confirmYear} records?`}
-            </h3>
-            <p className="text-sm text-gray-600 mb-5">
-              {action === 'archive'
-                ? `All business records from ${confirmYear} will be hidden from the main list. They can be restored at any time.`
-                : `All archived records from ${confirmYear} will be restored to active status.`}
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setConfirmYear(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button
-                onClick={() => action === 'archive' ? archiveMutation.mutate(confirmYear) : unarchiveMutation.mutate(confirmYear)}
-                disabled={archiveMutation.isLoading || unarchiveMutation.isLoading}
-                className={`px-4 py-2 rounded-lg text-sm text-white disabled:opacity-50 ${action === 'archive' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-700 hover:bg-emerald-800'}`}>
-                {(archiveMutation.isLoading || unarchiveMutation.isLoading) ? 'Processing…' : action === 'archive' ? 'Archive' : 'Restore'}
-              </button>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                {action === 'archive' ? (
+                  <Archive className="h-6 w-6 text-amber-600" />
+                ) : (
+                  <RotateCcw className="h-6 w-6 text-emerald-600" />
+                )}
+                <h3 className="text-lg font-bold text-gray-900">
+                  {action === 'archive' ? `Archive ${confirmYear} Clearances?` : `Restore ${confirmYear} Clearances?`}
+                </h3>
+              </div>
+              
+              <p className="text-sm text-gray-600 mb-2">
+                {action === 'archive' 
+                  ? `All clearances from ${confirmYear} will be hidden from the main list.`
+                  : `All archived clearances from ${confirmYear} will be restored and visible again.`}
+              </p>
+              
+              <p className="text-xs text-gray-400 mb-6">
+                <strong>Note:</strong> Business records will remain active and unaffected.
+              </p>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmYear(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => action === 'archive' 
+                    ? archiveMutation.mutate(confirmYear) 
+                    : unarchiveMutation.mutate(confirmYear)
+                  }
+                  disabled={archiveMutation.isLoading || unarchiveMutation.isLoading}
+                  className={`px-4 py-2 rounded-lg text-sm text-white disabled:opacity-50 flex items-center gap-2 transition-colors ${
+                    action === 'archive' 
+                      ? 'bg-amber-600 hover:bg-amber-700' 
+                      : 'bg-emerald-700 hover:bg-emerald-800'
+                  }`}
+                >
+                  {(archiveMutation.isLoading || unarchiveMutation.isLoading) && (
+                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {action === 'archive' ? 'Archive Clearances' : 'Restore Clearances'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
