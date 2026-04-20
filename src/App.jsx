@@ -1,3 +1,4 @@
+// frontend/src/App.jsx
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
@@ -6,9 +7,8 @@ import { useEffect, useState } from 'react';
 import { useSessionTimeout } from './hooks/useSessionTimeout.jsx';
 
 import SidebarLayout from './components/SidebarLayout';
-import Login from './pages/Login';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
+import Home from './pages/Home';
+import About from './pages/About';
 import ChangePassword from './pages/ChangePassword';
 
 // Staff pages
@@ -67,7 +67,7 @@ const AppRoutes = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const location = useLocation();
 
-  // Inactivity timer 
+  /* Inactivity timer — only active for authenticated sessions */
   useSessionTimeout();
 
   useEffect(() => {
@@ -83,7 +83,12 @@ const AppRoutes = () => {
         position="top-right"
         toastOptions={{
           duration: 4000,
-          style: { background: '#fff', color: '#363636', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', borderRadius: '0.5rem' },
+          style: {
+            background: '#fff',
+            color: '#363636',
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+            borderRadius: '0.5rem',
+          },
         }}
       />
 
@@ -96,10 +101,14 @@ const AppRoutes = () => {
       />
 
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Public pages - all use the Home component which handles internal routing */}
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Home />} />
+        <Route path="/forgot-password" element={<Home />} />
+        <Route path="/reset-password" element={<Home />} />
+        <Route path="/about" element={<About />} />
 
+        {/* Staff routes */}
         <Route path="/staff" element={<PrivateRoute allowedRoles={['staff']}><StaffDashboard /></PrivateRoute>} />
         <Route path="/staff/bulk-import" element={<PrivateRoute allowedRoles={['staff']}><StaffBulkImport /></PrivateRoute>} />
         <Route path="/staff/business" element={<PrivateRoute allowedRoles={['staff']}><StaffBusinessRecords /></PrivateRoute>} />
@@ -109,6 +118,7 @@ const AppRoutes = () => {
         <Route path="/staff/inspections" element={<PrivateRoute allowedRoles={['staff']}><StaffInspections /></PrivateRoute>} />
         <Route path="/staff/reports" element={<PrivateRoute allowedRoles={['staff']}><StaffReports /></PrivateRoute>} />
 
+        {/* Admin routes */}
         <Route path="/admin" element={<PrivateRoute allowedRoles={['admin']}><AdminDashboard /></PrivateRoute>} />
         <Route path="/admin/staff" element={<PrivateRoute allowedRoles={['admin']}><AdminStaffManagement /></PrivateRoute>} />
         <Route path="/admin/business" element={<PrivateRoute allowedRoles={['admin']}><AdminBusinessRecords /></PrivateRoute>} />
@@ -121,8 +131,8 @@ const AppRoutes = () => {
         <Route path="/admin/archive" element={<PrivateRoute allowedRoles={['admin']}><AdminArchiveRecords /></PrivateRoute>} />
         <Route path="/admin/settings" element={<PrivateRoute allowedRoles={['admin']}><AdminSettings /></PrivateRoute>} />
 
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

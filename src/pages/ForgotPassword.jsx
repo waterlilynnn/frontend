@@ -214,12 +214,6 @@ const ForgotPassword = () => {
           </div>
         </div>
       </div>
-
-      <div className="relative z-10 text-center py-7">
-        <p className="text-[11px] lg:text-[13px] text-[#6a8a72] italic max-w-md mx-auto px-4">
-          A Web-Based System to Optimize Environmental Management Clearance at Tagaytay City Environment and Natural Resources Office
-        </p>
-      </div>
     </div>
   );
 };

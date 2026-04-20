@@ -15,11 +15,11 @@ const decodeJwt = (token) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]       = useState(null);
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token      = localStorage.getItem('token');
+    const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
       try {
@@ -48,29 +48,15 @@ export const AuthProvider = ({ children }) => {
 
       let formattedUser;
       try {
-        const usersRes = await API.get('/users', {
-          headers: { Authorization: `Bearer ${access_token}` },
-        });
+        const usersRes = await API.get('/users', { headers: { Authorization: `Bearer ${access_token}` } });
         const userData = usersRes.data.find(u => u.id === parseInt(payload.sub));
         if (userData) {
-          formattedUser = {
-            id:        userData.id,
-            email:     userData.email,
-            full_name: userData.full_name,
-            role:      userData.role.toLowerCase(),
-            is_active: userData.is_active,
-          };
+          formattedUser = { id: userData.id, email: userData.email, full_name: userData.full_name, role: userData.role.toLowerCase(), is_active: userData.is_active };
         }
       } catch {}
 
       if (!formattedUser) {
-        formattedUser = {
-          id:        parseInt(payload.sub),
-          email,
-          full_name: email.split('@')[0],
-          role:      (payload.role || 'staff').toLowerCase(),
-          is_active: true,
-        };
+        formattedUser = { id: parseInt(payload.sub), email, full_name: email.split('@')[0], role: (payload.role || 'staff').toLowerCase(), is_active: true };
       }
 
       localStorage.setItem('token', access_token);
@@ -85,17 +71,13 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     const token = localStorage.getItem('token');
     if (token) {
-      try {
-        await API.post('/users/logout', {}, { headers: { Authorization: `Bearer ${token}` } });
-      } catch {}
+      try { await API.post('/users/logout', {}, { headers: { Authorization: `Bearer ${token}` } }); } catch {}
     }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('needsPasswordChange');
     setUser(null);
-
-    window.history.replaceState(null, '', window.location.pathname);
-    window.location.replace('/');
+    window.location.href = '/';
   };
 
   return (
