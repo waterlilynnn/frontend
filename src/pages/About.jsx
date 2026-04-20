@@ -256,10 +256,10 @@ export default function About() {
       {/* Footer */}
       <footer className="py-3 border-t border-gray-100 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-gray-400">
+          <p className="text-[10px] sm:text-xs text-gray-400">
             © {new Date().getFullYear()} EMC System — City Government of Tagaytay. All rights reserved.
           </p>
-          <p className="text-xs italic text-gray-400">Better, Cleaner, &amp; Greener Tagaytay</p>
+          <p className="text-[10px] sm:text-xs italic text-gray-400">Better, Cleaner, &amp; Greener Tagaytay</p>
         </div>
       </footer>
 
