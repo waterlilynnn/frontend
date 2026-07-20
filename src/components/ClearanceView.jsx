@@ -95,7 +95,7 @@ const ClearanceView = ({ rolePrefix = 'staff' }) => {
       if (match?.[1]) {
         filename = match[1].replace(/['"]/g, '');
       } else if (controlNumber) {
-        filename = `EMC_CLEARANCE_${controlNumber}.pdf`;
+        filename = `${controlNumber}.pdf`;
       }
 
       const url = URL.createObjectURL(

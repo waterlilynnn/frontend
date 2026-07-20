@@ -92,13 +92,14 @@ function Login() {
       <div className="relative z-10 flex-1 flex items-center justify-center lg:items-start lg:pt-16">
         <div className="w-full max-w-sm mx-4 lg:min-w-[450px] lg:max-w-md">
 
-          <div className="flex justify-center">
-            <div className="relative z-10 mb-[-48px] lg:min-w-20 w-24 h-24 rounded-full bg-[#0a6045] border-4 border-[#edf3f0] shadow-xl flex items-center justify-center">
-              <User className="h-10 w-10 text-white" strokeWidth={1.5} />
+          <div className="relative">
+            <div className="flex justify-center mb-[-48px] relative z-20">
+              <div className="w-24 h-24 rounded-full bg-[#0a6045] border-4 border-white shadow-xl flex items-center justify-center">
+                <User className="h-10 w-10 text-white" strokeWidth={1.5} />
+              </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-xl border border-black/[0.07] pt-16 pb-6 px-6 lg:pb-8 lg:px-8 shadow-lg">
+          <div className="bg-white rounded-xl border border-black/[0.07] pt-16 pb-6 px-6 lg:pb-8 lg:px-8 shadow-lg relative z-10">
 
             <div className="text-center mb-6">
               <h2 className="text-xl font-bold text-[#0a6045]">Welcome!</h2>
@@ -193,6 +194,7 @@ function Login() {
               </button>
             </form>
 
+          </div>
           </div>
         </div>
       </div>

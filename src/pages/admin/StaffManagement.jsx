@@ -15,7 +15,44 @@ const fmtDate = (d) => {
   catch { return '—'; }
 };
 
-/* Main component */
+/* ── search helpers ── */
+const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+/* FIX: bg-[#FFFF00] text-black, no px-0.5 */
+const Highlight = ({ text = '', query = '' }) => {
+  const q = (query ?? '').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+  if (!q || !text) return <>{String(text)}</>;
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = String(text).split(new RegExp(`(${escaped})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        norm(part) === norm(q)
+          ? <mark key={i} className="bg-[#FFFF00] text-black rounded-sm">{part}</mark>
+          : part
+      )}
+    </>
+  );
+};
+
+/*
+ * FIX: EmailHighlight — only highlights the local part (before @).
+ * e.g. searching "staff" highlights "staff" in "staff@cenro.gov.ph"
+ *      searching "cenro" does NOT highlight anything (domain is not searchable)
+ */
+const EmailHighlight = ({ email = '', query = '' }) => {
+  const atIdx = email.indexOf('@');
+  if (atIdx === -1) return <Highlight text={email} query={query} />;
+  const local  = email.slice(0, atIdx);
+  const domain = email.slice(atIdx);   // includes the @
+  return (
+    <>
+      <Highlight text={local} query={query} />
+      <span>{domain}</span>
+    </>
+  );
+};
+
 const StaffManagement = () => {
   const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery]       = useState('');
@@ -37,10 +74,12 @@ const StaffManagement = () => {
   const activeStaff   = allStaff.filter(s => s.is_active);
   const limitReached  = activeStaff.length >= MAX_STAFF;
 
-  const filtered = searchQuery.length >= 1
+  const filtered = searchQuery.trim()
     ? allStaff.filter(s => {
-        const q = searchQuery.toLowerCase();
-        return s.full_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+        const q = norm(searchQuery);
+        /* FIX: only search the local part of the email (before @) */
+        const emailLocal = (s.email || '').split('@')[0];
+        return norm(s.full_name).includes(q) || norm(emailLocal).includes(q);
       })
     : allStaff;
 
@@ -96,49 +135,31 @@ const StaffManagement = () => {
     },
   });
 
-  const handleDeactivateClick = (member) => {
-    setShowDeactivateConfirm(member);
-  };
-
-  const handleActivateClick = (member) => {
-    setShowActivateConfirm(member);
-  };
+  const handleDeactivateClick = (member) => { setShowDeactivateConfirm(member); };
+  const handleActivateClick   = (member) => { setShowActivateConfirm(member); };
 
   const confirmDeactivate = () => {
-    if (showDeactivateConfirm) {
-      toggleStatus.mutate(showDeactivateConfirm.id);
-    }
+    if (showDeactivateConfirm) toggleStatus.mutate(showDeactivateConfirm.id);
   };
 
   const confirmActivate = () => {
-    if (showActivateConfirm) {
-      toggleStatus.mutate(showActivateConfirm.id);
-    }
+    if (showActivateConfirm) toggleStatus.mutate(showActivateConfirm.id);
   };
 
   const handleNewStaffClick = () => {
-    if (limitReached) {
-      setShowLimitModal(true);
-    } else {
-      setShowCreateModal(true);
-    }
+    if (limitReached) setShowLimitModal(true);
+    else setShowCreateModal(true);
   };
 
   const handleDeactivateAndProceed = () => {
-    if (!selectedToDeactivate) {
-      toast.error('Please select a staff member to deactivate first.');
-      return;
-    }
+    if (!selectedToDeactivate) { toast.error('Please select a staff member to deactivate first.'); return; }
     setPendingCreate(true);
     toggleStatus.mutate(selectedToDeactivate);
   };
 
   const handleCreateStaff = async (e) => {
     e.preventDefault();
-    if (!newStaff.full_name || !newStaff.email) {
-      toast.error('Please fill in all fields');
-      return;
-    }
+    if (!newStaff.full_name || !newStaff.email) { toast.error('Please fill in all fields'); return; }
     setCreating(true);
     await createStaff.mutateAsync(newStaff);
     setCreating(false);
@@ -154,6 +175,7 @@ const StaffManagement = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
       {/* Deactivate Confirmation Modal */}
       {showDeactivateConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -206,9 +228,9 @@ const StaffManagement = () => {
                 <button onClick={() => setShowActivateConfirm(null)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
                   Cancel
                 </button>
-                <button 
-                  onClick={confirmActivate} 
-                  disabled={toggleStatus.isLoading || activeStaff.length >= MAX_STAFF} 
+                <button
+                  onClick={confirmActivate}
+                  disabled={toggleStatus.isLoading || activeStaff.length >= MAX_STAFF}
                   className="px-4 py-2 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 disabled:opacity-50"
                 >
                   {toggleStatus.isLoading ? 'Processing...' : 'Activate'}
@@ -238,17 +260,35 @@ const StaffManagement = () => {
           </div>
         )}
 
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           <input
-            type="search"
+            type="text"
             placeholder="Search by name or email…"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-forest-500 focus:border-forest-500 text-sm"
+            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 text-sm"
           />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
+        {searchQuery && (
+          <p className="text-xs text-gray-500">
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+              {totalCount} result{totalCount !== 1 ? 's' : ''} for &quot;{searchQuery.trim()}&quot;
+            </span>
+          </p>
+        )}
+
+        {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: 'Total Staff', value: allStaff.length },
@@ -270,6 +310,7 @@ const StaffManagement = () => {
             </div>
           ) : (
             <>
+              {/* Desktop table */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -282,8 +323,13 @@ const StaffManagement = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {items.map((member) => (
                       <tr key={member.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{member.full_name}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{member.email}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          <Highlight text={member.full_name} query={searchQuery} />
+                        </td>
+                        {/* FIX: EmailHighlight only highlights the local part before @ */}
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <EmailHighlight email={member.email} query={searchQuery} />
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">{fmtDate(member.created_at)}</td>
                         <td className="px-6 py-4">
                           <span className={`text-xs font-medium ${member.is_active ? 'text-green-700' : 'text-gray-500'}`}>
@@ -315,12 +361,18 @@ const StaffManagement = () => {
                 </table>
               </div>
 
+              {/* Mobile cards */}
               <div className="md:hidden divide-y divide-gray-100">
                 {items.map((member) => (
                   <div key={member.id} className="p-4 flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{member.full_name}</p>
-                      <p className="text-xs text-gray-500 truncate">{member.email}</p>
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        <Highlight text={member.full_name} query={searchQuery} />
+                      </p>
+                      {/* FIX: EmailHighlight for mobile too */}
+                      <p className="text-xs text-gray-500 truncate">
+                        <EmailHighlight email={member.email} query={searchQuery} />
+                      </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs font-medium ${member.is_active ? 'text-green-700' : 'text-gray-400'}`}>
                           {member.is_active ? 'Active' : 'Inactive'}
@@ -346,6 +398,7 @@ const StaffManagement = () => {
         </div>
       </div>
 
+      {/* Pagination — desktop only */}
       {!isMobile && totalPages > 1 && (
         <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
@@ -367,7 +420,7 @@ const StaffManagement = () => {
         </div>
       )}
 
-      {/* Limit modal - same as before */}
+      {/* Staff limit modal */}
       {showLimitModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
@@ -413,7 +466,7 @@ const StaffManagement = () => {
         </div>
       )}
 
-      {/* Create staff modal - same as before */}
+      {/* Create staff modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full">

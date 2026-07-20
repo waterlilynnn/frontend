@@ -6,7 +6,8 @@ const PDFViewer = ({ url, title, onClose, onDownload }) => {
   const [error, setError] = useState(false);
   const [scale, setScale] = useState(1);
   const iframeRef = useRef(null);
-  const filename = title || (url ? url.split('/').pop() : 'document.pdf');
+  const rawFilename = title || (url ? url.split('/').pop() : 'document.pdf');
+  const filename = title ? title.replace(/\.pdf$/i, '') : 'clearance';
 
   const handleIframeLoad = () => {
     setLoading(false);
@@ -24,7 +25,7 @@ const PDFViewer = ({ url, title, onClose, onDownload }) => {
       // For mobile, use window.open as fallback
       const link = document.createElement('a');
       link.href = url;
-      link.download = filename;
+      link.download = rawFilename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -213,7 +214,7 @@ const PDFViewer = ({ url, title, onClose, onDownload }) => {
             >
               <iframe
                 ref={iframeRef}
-                src={`${url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                src={`${url}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
                 className="w-full h-full border-0"
                 style={{ 
                   width: `${100 / scale}%`, 

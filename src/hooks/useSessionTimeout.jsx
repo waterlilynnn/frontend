@@ -41,7 +41,7 @@ export const useSessionTimeout = () => {
   useEffect(() => {
     if (!user) { clearAll(); return; }
 
-    const EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click', 'touchmove'];
+    const EVENTS = ['mousedown', 'keydown', 'touchstart', 'click', 'touchmove'];
     EVENTS.forEach(e => window.addEventListener(e, arm, { passive: true }));
     arm();
 

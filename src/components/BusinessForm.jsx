@@ -238,7 +238,7 @@ const BusinessForm = ({
           )}
           {isSubmitting
             ? (mode === 'create' ? 'Creating…' : 'Saving…')
-            : (mode === 'create' ? 'Create Record' : 'Save Changes')}
+            : (mode === 'create' ? 'Create' : 'Save Changes')}
         </button>
       </div>
     </form>

@@ -56,7 +56,7 @@ const AdminArchiveRecords = () => {
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Archive Clearances</h1>
+        <h1 className="text-xl font-bold text-gray-800">Archive Clearances</h1>
       </div>
 
       {/* Info Banner */}

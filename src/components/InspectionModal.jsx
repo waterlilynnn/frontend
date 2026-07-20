@@ -20,7 +20,7 @@ const SW_HAULING_CATS = [
   { key: 'biodeg', label: 'Biodegradable Wastes' },
   { key: 'hazardous', label: 'Hazardous Wastes' },
 ];
-const SW_HAULER_OPTS = ['CITY HAULER', 'BARANGAY', 'N/A'];
+const SW_HAULER_OPTS = ['CITY', 'HAULER', 'N/A'];
 
 const WWT_ITEMS = [
   { key: 'septic', label: 'Septic Tank' },
@@ -262,24 +262,10 @@ const InspectionModal = ({ business, isOpen, onClose, onSubmitSuccess }) => {
             <p className="text-xs text-gray-500 mt-0.5">{business?.establishment_name}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {showValidation && validationErrors.length > 0 && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <span className="text-sm font-semibold text-red-700">
-                {validationErrors.length} field{validationErrors.length > 1 ? 's' : ''} need attention
-              </span>
-            </div>
-            <ul className="text-xs text-red-600 space-y-0.5 max-h-20 overflow-y-auto">
-              {validationErrors.slice(0, 5).map((e, i) => <li key={i}>• {e}</li>)}
-              {validationErrors.length > 5 && <li>• and {validationErrors.length - 5} more...</li>}
-            </ul>
-          </div>
-        )}
+
 
         <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
           <div className="grid grid-cols-3 gap-3 text-xs">

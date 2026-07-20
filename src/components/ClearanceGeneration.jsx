@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -9,6 +9,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import {
   FileText, Search, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, AlertTriangle, X, ClipboardList,
+  Archive, Clock,
 } from 'lucide-react';
 
 const PER_PAGE = 10;
@@ -27,6 +28,149 @@ const extractErrorMsg = (error) => {
   return JSON.stringify(detail);
 };
 
+/* search helpers */
+const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+const hit = (text, q) => {
+  const t = norm(text);
+  const words = norm(q).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  return words.every((w) => t.includes(w));
+};
+const escapeChar = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const buildFlexPattern = (word) => word.split('').map(escapeChar).join('[^a-zA-Z0-9]*');
+const Highlight = ({ text = '', query = '' }) => {
+  const words = norm(query).split(' ').filter(Boolean);
+  if (words.length === 0 || !text) return <>{String(text)}</>;
+  const pattern = words.map(buildFlexPattern).join('|');
+  const parts = String(text).split(new RegExp(`(${pattern})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1
+          ? <mark key={i} className="bg-[#FFFF00] text-black rounded-sm">{part}</mark>
+          : part
+      )}
+    </>
+  );
+};
+
+const formatOwnerName = (item) => {
+  if (item.owner_last_name && item.owner_first_name) {
+    return `${item.owner_last_name}, ${item.owner_first_name}`;
+  }
+  return item.owner_name_raw || item.owner_name || '—';
+};
+
+/* Past Clearances Modal */
+const PastClearancesModal = ({ business, onClose, onView }) => {
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['bizClearanceHistory', business.id],
+    queryFn: async () => (await API.get(`/clearance/business/${business.id}/history`)).data,
+  });
+
+  const archived  = history.filter(c => c.is_archived);
+  const active    = history.filter(c => !c.is_archived);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Clearance History</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{business.establishment_name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin h-6 w-6 border-b-2 border-emerald-700 rounded-full" />
+            </div>
+          ) : history.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 text-sm">No clearance history found</div>
+          ) : (
+            <>
+              {/* Active clearances */}
+              {active.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Active</p>
+                  <div className="space-y-2">
+                    {active.map(c => (
+                      <ClearanceHistoryCard key={c.id} c={c} onView={onView} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Archived clearances */}
+              {archived.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 mt-2">
+                    Archived
+                  </p>
+                  <div className="space-y-2">
+                    {archived.map(c => (
+                      <ClearanceHistoryCard key={c.id} c={c} onView={onView} isArchived />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose}
+            className="px-4 py-2 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClearanceHistoryCard = ({ c, onView, isArchived = false }) => (
+  <div className={`border rounded-xl p-4 flex items-start justify-between gap-3
+    ${isArchived ? 'border-gray-100 bg-gray-50' : 'border-emerald-100 bg-emerald-50/40'}`}>
+    <div className="flex-1 min-w-0 space-y-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-mono font-semibold text-gray-800">{c.control_number}</span>
+        {isArchived
+          ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-200 text-gray-500">
+              <Archive className="h-2.5 w-2.5" />Archived
+            </span>
+          : c.is_claimed
+            ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">
+                <CheckCircle className="h-2.5 w-2.5" />Issued
+              </span>
+            : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700">
+                <Clock className="h-2.5 w-2.5" />Not Yet Issued
+              </span>
+        }
+      </div>
+      <p className="text-xs text-gray-500">
+        Valid until: {c.valid_until ? format(new Date(c.valid_until), 'MMM dd, yyyy') : '—'}
+      </p>
+      <p className="text-xs text-gray-400">
+        {isArchived && c.archived_at
+          ? `Archived: ${format(new Date(c.archived_at), 'MMM dd, yyyy')}`
+          : `Generated: ${c.printed_at ? format(new Date(c.printed_at), 'MMM dd, yyyy') : '—'}`}
+      </p>
+    </div>
+    <button
+      onClick={() => onView(c.id, c.control_number)}
+      className="shrink-0 px-3 py-1.5 border border-emerald-700 text-emerald-700 text-xs rounded-lg hover:bg-emerald-50 transition-colors"
+    >
+      View PDF
+    </button>
+  </div>
+);
+
+/* Main Component */
 const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -41,57 +185,50 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
   const [viewingClearanceId, setViewingClearanceId] = useState(null);
   const [viewingControlNumber, setViewingControlNumber] = useState('');
   const [generateError, setGenerateError]           = useState('');
-  const [showHistoryBusiness, setShowHistoryBusiness] = useState(null);
+  const [historyBusiness, setHistoryBusiness]       = useState(null);
 
-  // Fetch all businesses + clearances
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['clearanceBusinesses', searchQuery],
+    queryKey: ['clearanceBusinesses'],
     queryFn: async () => {
-      let businesses;
-      if (searchQuery && searchQuery.length >= 2) {
-        const res = await API.get(`/business-records/search?q=${searchQuery}&per_page=1000`);
-        businesses = res.data || [];
-      } else {
-        const res = await API.get('/business-records/all');
-        businesses = res.data || [];
-      }
-
-      const clearancesRes = await API.get('/clearance/history/all');
-      const clearances    = clearancesRes.data || [];
+      const [bizRes, clearancesRes] = await Promise.all([
+        API.get('/business-records/all'),
+        API.get('/clearance/history/all'),
+      ]);
+      const businesses = bizRes.data || [];
+      const clearances = clearancesRes.data || [];
 
       const items = businesses.map((business) => {
-        const clearance = clearances.find((c) => c.business_record_id === business.id);
+        const activeClearance = clearances.find(
+          (c) => c.business_record_id === business.id && !c.is_archived
+        );
+        const hasAnyClearance = clearances.some(
+          (c) => c.business_record_id === business.id
+        );
+
         return {
           id:               business.id,
           establishment_name: business.establishment_name,
-          owner_name:       business.owner_name,
-          control_number:   clearance?.control_number || business.control_number,
+          owner_name:       business.owner_name       || '',
+          owner_name_raw:   business.owner_name_raw   || '',
+          owner_last_name:  business.owner_last_name  || '',
+          owner_first_name: business.owner_first_name || '',
+          control_number:   activeClearance?.control_number || business.control_number,
           hauler_type:      business.hauler_type,
           has_violation:    business.has_violation,
           violation_details: business.violation_details || '—',
-          clearance_id:     clearance?.id,
-          is_claimed:       clearance?.is_claimed || false,
-          printed_at:       clearance?.printed_at,
-          last_printed_at:  clearance?.last_printed_at,
-          last_printed_by:  clearance?.last_printed_by,
-          printed_by:       clearance?.printed_by,
-          has_clearance:    !!clearance,
+          clearance_id:     activeClearance?.id,
+          is_claimed:       activeClearance?.is_claimed || false,
+          printed_at:       activeClearance?.printed_at,
+          last_printed_at:  activeClearance?.last_printed_at,
+          last_printed_by:  activeClearance?.last_printed_by,
+          printed_by:       activeClearance?.printed_by,
+          has_clearance:    !!activeClearance,
+          has_any_clearance: hasAnyClearance,
         };
       });
 
       return { items, total: items.length };
     },
-  });
-
-  // Fetch inspections for history modal
-  const { data: inspections = [] } = useQuery({
-    queryKey: ['businessInspectionsHistory', showHistoryBusiness?.id],
-    queryFn: async () => {
-      if (!showHistoryBusiness?.id) return [];
-      const res = await API.get(`/inspections/business/${showHistoryBusiness.id}`);
-      return res.data;
-    },
-    enabled: !!showHistoryBusiness?.id,
   });
 
   const generateMutation = useMutation({
@@ -106,7 +243,7 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
     onError: (error) => toast.error(extractErrorMsg(error)),
   });
 
-  const viewClearance = async (clearanceId, businessName, controlNumber) => {
+  const viewClearance = async (clearanceId, controlNumber) => {
     try {
       toast.loading('Loading clearance…', { id: 'view-clearance' });
       const response = await API.post(`/clearance/view/${clearanceId}`, null, { responseType: 'blob' });
@@ -157,109 +294,99 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
 
   const closeGenerateModal = () => { setShowGenerateModal(false); setSelectedBusiness(null); setGenerateError(''); };
 
-  const allItems   = data?.items || [];
+  const allItems = useMemo(() => {
+    const q = norm(searchQuery);
+    const raw = data?.items || [];
+    if (!q) return raw;
+    return raw.filter(item => {
+      const ownerFull = [item.owner_last_name, item.owner_first_name].filter(Boolean).join(' ');
+      return (
+        hit(item.establishment_name, q) ||
+        hit(item.owner_last_name,    q) ||
+        hit(item.owner_first_name,   q) ||
+        hit(ownerFull,               q) ||
+        hit(item.owner_name_raw,     q) ||
+        hit(item.control_number,     q)
+      );
+    });
+  }, [data, searchQuery]);
+
   const totalCount = allItems.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE);
   const items = isMobile ? allItems : allItems.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   const StatusChip = ({ item }) => {
-    if (item.is_claimed) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><CheckCircle className="h-3 w-3" />Issued</span>;
-    if (item.has_clearance) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"><XCircle className="h-3 w-3" />Not Yet Issued</span>;
+    if (item.has_clearance) {
+      if (item.is_claimed)
+        return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><CheckCircle className="h-3 w-3" />Issued</span>;
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"><XCircle className="h-3 w-3" />Not Yet Issued</span>;
+    }
     return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No Clearance</span>;
   };
 
   const ActionButtons = ({ item }) => (
-    item.has_clearance ? (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => viewClearance(item.clearance_id, item.establishment_name, item.control_number)}
-          disabled={item.has_violation}
-          className={`px-3 py-1 border text-xs rounded ${item.has_violation ? 'border-gray-300 text-gray-400 cursor-not-allowed' : 'border-emerald-700 text-emerald-700 hover:bg-forest-50'}`}
-        >View</button>
-        {!item.is_claimed && (
-          <button onClick={() => { setSelectedClearance(item); setShowIssueModal(true); }}
-            className="text-emerald-700 hover:text-forest-800 text-xs font-medium">
-            Issue
-          </button>
-        )}
-      </div>
-    ) : (
-      <button
-        onClick={() => handleGenerateClick(item)}
-        disabled={item.has_violation}
-        className={`inline-flex items-center px-3 py-1 text-xs rounded ${item.has_violation ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-emerald-700 text-white hover:bg-emerald-800'}`}
-      >Generate</button>
-    )
-  );
-
-  // Inspection History Modal Component
-  const HistoryModal = ({ business, onClose }) => {
-    const fmtDt = (d) => {
-      try { return format(new Date(d), 'MMM dd, yyyy hh:mm a'); }
-      catch { return '—'; }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Inspection History</h2>
-              <p className="text-sm text-gray-500">{business?.establishment_name}</p>
-            </div>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg">
-              <X className="h-5 w-5" />
+    <div className="flex items-center gap-2 flex-wrap">
+      {item.has_clearance ? (
+        <>
+          <button
+            onClick={() => viewClearance(item.clearance_id, item.control_number)}
+            disabled={item.has_violation}
+            className={`px-3 py-1 border text-xs rounded transition-colors ${
+              item.has_violation
+                ? 'border-gray-300 text-gray-400 cursor-not-allowed'
+                : 'border-emerald-700 text-emerald-700 hover:bg-emerald-50'
+            }`}
+          >View</button>
+          {!item.is_claimed && (
+            <button onClick={() => { setSelectedClearance(item); setShowIssueModal(true); }}
+              className="text-emerald-700 hover:text-emerald-900 text-xs font-medium">
+              Issue
             </button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-            {inspections.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">No inspection records found</div>
-            ) : (
-              inspections.map(insp => (
-                <div key={insp.id} className={`border rounded-lg p-4 ${
-                  insp.status === 'WITH VIOLATION' && !insp.is_resolved ? 'border-red-200 bg-red-50' :
-                  insp.is_resolved ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-500">{fmtDt(insp.date)}</span>
-                    {insp.status === 'WITH VIOLATION' && !insp.is_resolved ? (
-                      <span className="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">With Violation</span>
-                    ) : insp.is_resolved ? (
-                      <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Resolved</span>
-                    ) : (
-                      <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Passed</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-700">{insp.remarks || 'No remarks'}</p>
-                  {insp.is_resolved && (
-                    <div className="mt-2 text-xs text-blue-600">
-                      Resolved by {insp.resolved_by} on {fmtDt(insp.resolved_at)}
-                      {insp.resolved_remarks && <p className="mt-0.5">Note: {insp.resolved_remarks}</p>}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
-            <button onClick={onClose} className="px-4 py-2 bg-emerald-700 text-white rounded-lg text-sm hover:bg-emerald-800">Close</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
+          )}
+        </>
+      ) : (
+        <button
+          onClick={() => handleGenerateClick(item)}
+          disabled={item.has_violation}
+          className={`inline-flex items-center px-3 py-1 text-xs rounded transition-colors ${
+            item.has_violation
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              : 'bg-emerald-700 text-white hover:bg-emerald-800'
+          }`}
+        >Generate</button>
+      )}
+
+      {item.has_any_clearance && (
+        <button
+          onClick={() => setHistoryBusiness(item)}
+          className="inline-flex items-center gap-1 px-3 py-1 border border-gray-300 text-gray-500 text-xs rounded hover:bg-gray-50 transition-colors"
+        >
+          <Archive className="h-3 w-3" />
+          Past Clearances
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* History Modal */}
-      {showHistoryBusiness && (
-        <HistoryModal business={showHistoryBusiness} onClose={() => setShowHistoryBusiness(null)} />
+
+      {/* Past Clearances Modal */}
+      {historyBusiness && (
+        <PastClearancesModal
+          business={historyBusiness}
+          onClose={() => setHistoryBusiness(null)}
+          onView={(clearanceId, controlNumber) => {
+            setHistoryBusiness(null);
+            viewClearance(clearanceId, controlNumber);
+          }}
+        />
       )}
 
       {/* Generate modal */}
       {showGenerateModal && selectedBusiness && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-900">Generate Clearance</h3>
@@ -268,7 +395,7 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
               <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                 <p className="font-medium text-gray-900">{selectedBusiness.establishment_name}</p>
                 <div className="mt-2 space-y-1 text-sm text-gray-600">
-                  <p>Owner: {selectedBusiness.owner_name}</p>
+                  <p>Owner: {formatOwnerName(selectedBusiness)}</p>
                   <p>Control #: {selectedBusiness.control_number || '—'}</p>
                   <p>Hauler: {selectedBusiness.hauler_type}</p>
                 </div>
@@ -288,9 +415,10 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
                   </div>
                 </div>
               )}
-              {!generateError && <p className="text-gray-600 mb-4">Generate clearance for this business?</p>}
+              {!generateError && <p className="text-gray-600 mb-4 text-sm">Generate clearance for this business?</p>}
               <div className="flex justify-end gap-3">
-                <button onClick={closeGenerateModal} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">
+                <button onClick={closeGenerateModal}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">
                   {generateError ? 'Close' : 'Cancel'}
                 </button>
                 {!generateError && (
@@ -305,13 +433,16 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
         </div>
       )}
 
+      {/* Issue modal */}
       {showIssueModal && selectedClearance && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-900">Mark as Issued</h3>
-                <button onClick={() => { setShowIssueModal(false); setSelectedClearance(null); }}><X className="h-5 w-5 text-gray-400" /></button>
+                <button onClick={() => { setShowIssueModal(false); setSelectedClearance(null); }}>
+                  <X className="h-5 w-5 text-gray-400" />
+                </button>
               </div>
               <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                 <p className="font-medium text-gray-900">{selectedClearance.establishment_name}</p>
@@ -331,23 +462,45 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
         </div>
       )}
 
-      {showViewer && pdfUrl && <PDFViewer url={pdfUrl} onClose={closeViewer} onDownload={handleDownload} />}
+      {showViewer && pdfUrl && (
+        <PDFViewer
+          url={pdfUrl}
+          title={viewingControlNumber || 'clearance'}
+          onClose={closeViewer}
+          onDownload={handleDownload}
+        />
+      )}
 
       <div className="pb-6 lg:pb-28 space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Clearance Management</h1>
         </div>
 
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by business name or control number…"
+            placeholder="Search by establishment name, owner, or control #…"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-forest-500 focus:border-forest-500 text-sm"
+            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 text-sm"
           />
+          {searchQuery && (
+            <button onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+              className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+
+        {searchQuery && !isLoading && (
+          <p className="text-xs text-gray-500">
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+              {totalCount} result{totalCount !== 1 ? 's' : ''} for &quot;{searchQuery.trim()}&quot;
+            </span>
+          </p>
+        )}
 
         <div className="bg-white rounded-lg shadow-sm">
           {isLoading ? (
@@ -375,57 +528,69 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
                     {items.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{item.establishment_name}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">Control #: {item.control_number || '—'}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            <Highlight text={item.establishment_name} query={searchQuery} />
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            Owner: <Highlight text={formatOwnerName(item)} query={searchQuery} />
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            Control #:{' '}
+                            {item.has_clearance
+                              ? <Highlight text={item.control_number || ''} query={searchQuery} />
+                              : <span className="italic text-gray-300">no active clearance</span>}
+                          </div>
                           {item.has_violation && (
-                            <button
-                              onClick={() => setShowHistoryBusiness(item)}
-                              className="flex items-center text-xs text-red-600 hover:text-red-800 hover:underline mt-1"
-                            >
+                            <div className="flex items-center text-xs text-red-600 mt-1">
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               With Violation
-                            </button>
+                            </div>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">{formatDateTime(item.last_printed_at || item.printed_at)}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">by: {item.last_printed_by || item.printed_by || '—'}</div>
+                          {item.has_clearance ? (
+                            <>
+                              <div className="text-sm text-gray-900">{formatDateTime(item.last_printed_at || item.printed_at)}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">by: {item.last_printed_by || item.printed_by || '—'}</div>
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-300 italic">—</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap"><StatusChip item={item} /></td>
-                        <td className="px-6 py-4 whitespace-nowrap"><ActionButtons item={item} /></td>
+                        <td className="px-6 py-4"><ActionButtons item={item} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Mobile card list */}
+              {/* Mobile cards */}
               <div className="md:hidden divide-y divide-gray-100">
                 {items.map((item) => (
                   <div key={item.id} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{item.establishment_name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Control #: {item.control_number || '—'}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          <Highlight text={item.establishment_name} query={searchQuery} />
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          <Highlight text={formatOwnerName(item)} query={searchQuery} />
+                        </p>
                         {item.has_violation && (
-                          <button
-                            onClick={() => setShowHistoryBusiness(item)}
-                            className="flex items-center text-xs text-red-600 hover:text-red-800 hover:underline mt-1"
-                          >
-                            <AlertTriangle className="h-3 w-3 mr-1 shrink-0" />
-                            With Violation
-                          </button>
+                          <p className="flex items-center text-xs text-red-600 mt-0.5">
+                            <AlertTriangle className="h-3 w-3 mr-1 shrink-0" />With Violation
+                          </p>
                         )}
                       </div>
                       <StatusChip item={item} />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-500">{formatDateTime(item.last_printed_at || item.printed_at)}</p>
-                        <p className="text-xs text-gray-400">by: {item.last_printed_by || item.printed_by || '—'}</p>
-                      </div>
-                      <ActionButtons item={item} />
-                    </div>
+                    {item.has_clearance && (
+                      <p className="text-xs text-gray-400">
+                        {formatDateTime(item.last_printed_at || item.printed_at)}
+                      </p>
+                    )}
+                    <ActionButtons item={item} />
                   </div>
                 ))}
               </div>
@@ -435,7 +600,7 @@ const ClearanceGeneration = ({ rolePrefix = 'staff' }) => {
       </div>
 
       {/* Pagination — desktop only */}
-      {!isMobile && totalPages > 1 && (
+      {!isMobile && !isLoading && totalPages > 1 && (
         <div className="fixed bottom-4 left-64 right-4 z-10">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-6 py-3 flex items-center justify-between">
             <span className="text-sm text-gray-700">

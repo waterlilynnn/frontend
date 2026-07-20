@@ -139,7 +139,6 @@ const Header = ({ onMenuToggle, sidebarOpen }) => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-800">Edit Profile</h2>
                 <button onClick={() => setShowEditProfile(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="h-5 w-5" />
                 </button>
               </div>
               <div className="space-y-4">
@@ -179,7 +178,7 @@ const Header = ({ onMenuToggle, sidebarOpen }) => {
                 >
                   {editing
                     ? <><span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving...</>
-                    : <><Save className="h-4 w-4" />Save Changes</>}
+                    : <>Save Changes</>}
                 </button>
               </div>
             </div>

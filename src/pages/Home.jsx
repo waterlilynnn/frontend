@@ -9,15 +9,15 @@ import {
   ShieldCheck, KeyRound, Facebook,
 } from 'lucide-react';
 
-/* view state keys */
+// view state keys 
 const V = { HOME: 'home', LOGIN: 'login', FORGOT: 'forgot', VERIFY: 'verify', RESET: 'reset' };
 
-/* shared input styles — reduced padding on mobile */
-const IN  = 'w-full pl-10 pr-4 py-2.5 sm:py-3.5 lg:py-4 text-sm bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f6e53]/30 focus:border-[#0f6e53] focus:bg-white transition-all duration-200';
-const INR = 'w-full pl-10 pr-12 py-2.5 sm:py-3.5 lg:py-4 text-sm bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f6e53]/30 focus:border-[#0f6e53] focus:bg-white transition-all duration-200';
+// shared input styles
+const IN  = 'w-full pl-10 pr-4 py-2.5 sm:py-3.5 lg:py-4 text-sm bg-white/80 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f6e53]/30 focus:border-[#0f6e53] focus:bg-white transition-all duration-200';
+const INR = 'w-full pl-10 pr-12 py-2.5 sm:py-3.5 lg:py-4 text-sm bg-white/80 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0f6e53]/30 focus:border-[#0f6e53] focus:bg-white transition-all duration-200';
 const BTN = 'w-full py-2.5 sm:py-3.5 lg:py-4 bg-gradient-to-r from-[#0f6e53] to-[#0a6045] hover:from-[#0a6045] hover:to-[#085041] text-white text-sm font-medium rounded-xl transition-all duration-300 disabled:opacity-60 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5';
 
-/* floating icon per view */
+// floating icon per view
 const AUTH_ICON = { [V.LOGIN]: User, [V.FORGOT]: Mail, [V.VERIFY]: ShieldCheck, [V.RESET]: KeyRound };
 
 export default function Home() {
@@ -28,7 +28,7 @@ export default function Home() {
   const [view,      setView]      = useState(V.HOME);
   const [fading,    setFading]    = useState(false);
 
-  /* login */
+  // login 
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
   const [showPw,       setShowPw]       = useState(false);
@@ -36,17 +36,17 @@ export default function Home() {
   const [loginError,   setLoginError]   = useState('');
   const [loginSuccess, setLoginSuccess] = useState(false);
 
-  /* forgot */
+  // forgot 
   const [forgotEmail,   setForgotEmail]   = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
 
-  /* verify */
+  // verify 
   const [code,          setCode]          = useState(['','','','','','']);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [countdown,     setCountdown]     = useState(0);
   const [resendLoading, setResendLoading] = useState(false);
 
-  /* reset */
+  // reset 
   const [newPw,        setNewPw]        = useState('');
   const [confirmPw,    setConfirmPw]    = useState('');
   const [showNewPw,    setShowNewPw]    = useState(false);
@@ -80,7 +80,7 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [resetDone, resetCd]);
 
-  /* helpers */
+  // helpers 
   const switchAuth = (next) => {
     setFading(true);
     setTimeout(() => { setView(next); setFading(false); }, 200);
@@ -104,7 +104,7 @@ export default function Home() {
     const t = setInterval(() => setCountdown(c => { if (c <= 1) { clearInterval(t); return 0; } return c - 1; }), 1000);
   };
 
-  /* handlers */
+  // handlers 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginLoading(true); setLoginError('');
@@ -168,7 +168,7 @@ export default function Home() {
     setResetLoading(false);
   };
 
-  /* derived */
+  // derived 
   const isAuth   = view !== V.HOME;
   const AuthIcon = AUTH_ICON[view] || User;
   const pwsMatch = confirmPw && newPw === confirmPw;
@@ -187,12 +187,10 @@ export default function Home() {
       <div className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.06]"
            style={{ backgroundImage: "url('/cityhall.jpg')" }} />
 
-      {/* ─── MAIN CONTENT ─── */}
+      {/* MAIN CONTENT */}
       <div className="relative z-10 flex-1 flex items-center justify-center overflow-hidden py-6 sm:py-8 px-4">
 
-        {/* ════════════════════════════════
-            HOME VIEW
-        ════════════════════════════════ */}
+        {/* HOME VIEW */}
         <div className={`absolute inset-0 flex items-center justify-center px-4 sm:px-6 py-8
           transition-all duration-700 ease-in-out
           ${!isAuth ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 -translate-x-32 scale-95 pointer-events-none'}`}>
@@ -275,9 +273,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ════════════════════════════════
-            AUTH PANEL
-        ════════════════════════════════ */}
+        {/* AUTH PANEL */}
         <div className={`relative w-full max-w-sm sm:max-w-md lg:max-w-lg
           transition-all duration-700 ease-in-out
           ${isAuth ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-32 scale-95 pointer-events-none'}`}>
@@ -293,8 +289,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Card */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl border border-white/20 pt-16 sm:pt-24 pb-6 sm:pb-10 lg:pb-12 px-5 sm:px-7 lg:px-9 shadow-2xl">
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl border border-white/20 pt-16 sm:pt-24 pb-6 sm:pb-10 lg:pb-12 px-5 sm:px-7 lg:px-9 shadow-2xl relative z-0">
             <div className={`transition-all duration-300 ${fading ? 'opacity-0 translate-y-3' : 'opacity-100 translate-y-0'}`}>
 
               {/* LOGIN */}
@@ -329,7 +324,7 @@ export default function Home() {
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">Email address</label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53]" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53] z-10" />
                         <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
                                placeholder="name@example.com" className={IN} />
                       </div>
@@ -344,12 +339,12 @@ export default function Home() {
                         </button>
                       </div>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53]" />
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53] z-10" />
                         <input type={showPw ? 'text' : 'password'} required value={password}
                                onChange={e => setPassword(e.target.value)}
                                placeholder="••••••••" className={INR} />
                         <button type="button" onClick={() => setShowPw(v => !v)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10">
                           {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
@@ -372,7 +367,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* FORGOT */}
+            {/* FORGOT */}
               {view === V.FORGOT && (
                 <div>
                   <div className="text-center mb-5 sm:mb-8">
@@ -384,7 +379,7 @@ export default function Home() {
                     <div>
                       <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">Email address</label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53]" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53] z-10" />
                         <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                                placeholder="name@example.com" className={IN} />
                       </div>
@@ -495,12 +490,12 @@ export default function Home() {
                         <div>
                           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">New Password</label>
                           <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53]" />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53] z-10" />
                             <input type={showNewPw ? 'text' : 'password'} required value={newPw}
                                    onChange={e => setNewPw(e.target.value)}
                                    placeholder="Minimum 8 characters" className={INR} />
                             <button type="button" onClick={() => setShowNewPw(v => !v)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10">
                               {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                           </div>
@@ -509,12 +504,12 @@ export default function Home() {
                         <div>
                           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5">Confirm New Password</label>
                           <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53]" />
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 sm:h-5 w-4 sm:w-5 text-[#0f6e53] z-10" />
                             <input type={showCfmPw ? 'text' : 'password'} required value={confirmPw}
                                    onChange={e => setConfirmPw(e.target.value)}
                                    placeholder="Re-enter new password" className={INR} />
                             <button type="button" onClick={() => setShowCfmPw(v => !v)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-10">
                               {showCfmPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                           </div>

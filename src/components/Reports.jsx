@@ -7,7 +7,7 @@ import API from '../config/api';
 import useIsMobile from '../hooks/useIsMobile';
 import {
   Download, ChevronLeft, ChevronRight,
-  AlertTriangle, CheckCircle, Search, X, ShieldCheck,
+  AlertTriangle, CheckCircle, ShieldCheck,
 } from 'lucide-react';
 
 const fmtDt = (d) => { try { return format(new Date(d), 'MMM dd, yyyy hh:mm a'); } catch { return '—'; } };
@@ -48,7 +48,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
   const [filterType, setFilterType]             = useState(searchParams.get('filter') || 'all');
   const [filterInspStatus, setFilterInspStatus] = useState('all');
   const [filterHauler, setFilterHauler]         = useState('all');
-  const [search, setSearch]                     = useState('');
   const [currentPage, setCurrentPage]           = useState(1);
   const [pdfLoading, setPdfLoading]             = useState(false);
 
@@ -74,9 +73,8 @@ const Reports = ({ rolePrefix = 'staff' }) => {
     if (c.printed_at) { const d = new Date(c.printed_at); if (d < dateFrom || d > endOfDay(dateTo)) return false; }
     if (filterType === 'issued'  && !c.is_claimed) return false;
     if (filterType === 'pending' &&  c.is_claimed) return false;
-    if (search) { const q = search.toLowerCase(); if (!c.business_name?.toLowerCase().includes(q) && !c.control_number?.toLowerCase().includes(q)) return false; }
     return true;
-  }), [clearances, dateFrom, dateTo, filterType, search]);
+  }), [clearances, dateFrom, dateTo, filterType]);
 
   const filteredInspections = useMemo(() => {
     const base = allInspections.filter(i => {
@@ -85,7 +83,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
       if (filterInspStatus === 'unresolved' && !(i.status === 'WITH VIOLATION' && !i.is_resolved)) return false;
       if (filterInspStatus === 'resolved'   && !(i.status === 'WITH VIOLATION' &&  i.is_resolved)) return false;
       if (filterHauler !== 'all' && i.hauler_type !== filterHauler) return false;
-      if (search) { const q = search.toLowerCase(); if (!i.establishment_name?.toLowerCase().includes(q) && !i.bin_number?.toLowerCase().includes(q)) return false; }
       return true;
     });
     if (filterInspStatus === 'all') {
@@ -94,7 +91,7 @@ const Reports = ({ rolePrefix = 'staff' }) => {
       return [...unresolved, ...rest];
     }
     return [...base].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [allInspections, dateFrom, dateTo, filterInspStatus, filterHauler, search]);
+  }, [allInspections, dateFrom, dateTo, filterInspStatus, filterHauler]);
 
   const active     = tab === 'clearances' ? filteredClr : filteredInspections;
   const totalPages = Math.ceil(active.length / PER_PAGE);
@@ -104,7 +101,7 @@ const Reports = ({ rolePrefix = 'staff' }) => {
     ? active
     : active.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
-  const changeTab = (t) => { setTab(t); setCurrentPage(1); setFilterType('all'); setFilterInspStatus('all'); setSearch(''); setFilterHauler('all'); };
+  const changeTab = (t) => { setTab(t); setCurrentPage(1); setFilterType('all'); setFilterInspStatus('all'); setFilterHauler('all'); };
 
   const handleExportPDF = async () => {
     setPdfLoading(true);
@@ -112,7 +109,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
       const params = new URLSearchParams();
       params.set('date_from', dateFromStr);
       params.set('date_to',   dateToStr);
-      if (search) params.set('search', search);
       let endpoint;
       if (tab === 'clearances') {
         if (filterType !== 'all') params.set('status', filterType);
@@ -216,14 +212,6 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                   </>
                 )}
 
-                <div className="relative flex-1 min-w-[160px]">
-                  <Search className="absolute left-3 top-2 h-4 w-4 text-gray-400" />
-                  <input type="text" placeholder="Search…" value={search}
-                    onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                    className="w-full pl-9 pr-8 py-1.5 border border-gray-300 rounded-lg text-sm" />
-                  {search && <button onClick={() => setSearch('')} className="absolute right-2 top-2 text-gray-400"><X className="h-4 w-4" /></button>}
-                </div>
-
                 <span className="text-xs text-gray-400 font-medium whitespace-nowrap ml-auto">{active.length} record{active.length !== 1 ? 's' : ''}</span>
               </div>
             </div>
@@ -283,7 +271,7 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                     <table className="min-w-full divide-y divide-gray-100">
                       <thead className="bg-gray-50">
                         <tr>
-                          {['Business', 'Hauler', 'Inspector', 'Date', 'Result', 'Remarks / Resolution'].map(col => (
+                          {['Business', 'Hauler', 'Inspector', 'Date', 'Result', 'Violations', 'Remarks / Resolution'].map(col => (
                             <th key={col} className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">{col}</th>
                           ))}
                         </tr>
@@ -299,6 +287,14 @@ const Reports = ({ rolePrefix = 'staff' }) => {
                               <td className="px-5 py-3 text-sm text-gray-600 whitespace-nowrap">{i.inspector || '—'}</td>
                               <td className="px-5 py-3 text-sm text-gray-500 whitespace-nowrap">{fmtDt(i.date)}</td>
                               <td className="px-5 py-3 whitespace-nowrap"><InspStatusBadge status={i.status} isResolved={i.is_resolved} /></td>
+                              <td className="px-5 py-3 max-w-[200px]">
+                                {i.violations && i.violations.length > 0
+                                  ? <ul className="text-xs text-red-700 space-y-0.5 list-disc list-inside">{i.violations.map((v, idx) => <li key={idx}>{v}</li>)}</ul>
+                                  : i.violation_description
+                                    ? <p className="text-xs text-red-700">{i.violation_description}</p>
+                                    : <span className="text-xs text-gray-300">—</span>
+                                }
+                              </td>
                               <td className="px-5 py-3 max-w-[280px]">
                                 {i.remarks && <p className="text-sm text-gray-700 break-words">{i.remarks}</p>}
                                 {isResolved && (
@@ -368,4 +364,4 @@ const Reports = ({ rolePrefix = 'staff' }) => {
   );
 };
 
-export default Reports;
+export default Reports; 

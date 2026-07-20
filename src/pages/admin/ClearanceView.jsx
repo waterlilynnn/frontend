@@ -133,6 +133,7 @@ const AdminClearanceView = () => {
       {pdfUrl && (
         <PDFViewer
           url={pdfUrl}
+          title={controlNumber ? `${controlNumber}` : 'clearance'}
           onClose={() => navigate('/admin/clearance')}
           onDownload={() => downloadMutation.mutate()}
         />

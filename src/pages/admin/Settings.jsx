@@ -302,7 +302,7 @@ const BinFormatsTab = () => {
             </div>
           )}
         </div>
-        <button onClick={() => set(f => [...f, { id: uid(), segments: [7, 4, 7], label: 'New Format', is_active: true }])}
+        <button onClick={() => set(f => [...f, { id: uid(), segments: [0, 0, 0], label: 'New Format', is_active: false }])}
           className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800">
           <Plus className="h-4 w-4" />Add Format
         </button>
@@ -517,21 +517,17 @@ const BusinessLinesTab = () => {
                       type="checkbox"
                       checked={exemptedRequirements.includes(editDraft)}
                       onChange={() => {
-                        if (exemptedRequirements.includes(editDraft)) {
-                          setExemptedRequirements(prev => prev.filter(e => e !== editDraft));
-                        } else {
-                          setExemptedRequirements(prev => [...prev, editDraft]);
-                        }
+                        const key = editDraft;
+                        setExemptedRequirements(prev =>
+                          prev.includes(key) ? prev.filter(e => e !== key) : [...prev, key]
+                        );
                       }}
-                      className="h-4 w-4 text-emerald-700 rounded mx-auto"
-                    />
-                  ) : (
-                    <input
-                      type="checkbox"
-                      checked={exemptedRequirements.includes(line)}
-                      onChange={() => toggleExemptRequirement(line)}
                       className="h-4 w-4 text-emerald-700 rounded mx-auto cursor-pointer"
                     />
+                  ) : (
+                    exemptedRequirements.includes(line)
+                      ? <span className="text-emerald-600 font-bold text-base" title="Exempt">✓</span>
+                      : <span className="text-red-400 font-bold text-base" title="Not exempt">✗</span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
@@ -540,36 +536,32 @@ const BusinessLinesTab = () => {
                       type="checkbox"
                       checked={exemptedInspections.includes(editDraft)}
                       onChange={() => {
-                        if (exemptedInspections.includes(editDraft)) {
-                          setExemptedInspections(prev => prev.filter(e => e !== editDraft));
-                        } else {
-                          setExemptedInspections(prev => [...prev, editDraft]);
-                        }
+                        const key = editDraft;
+                        setExemptedInspections(prev =>
+                          prev.includes(key) ? prev.filter(e => e !== key) : [...prev, key]
+                        );
                       }}
-                      className="h-4 w-4 text-emerald-700 rounded mx-auto"
-                    />
-                  ) : (
-                    <input
-                      type="checkbox"
-                      checked={exemptedInspections.includes(line)}
-                      onChange={() => toggleExemptInspection(line)}
                       className="h-4 w-4 text-emerald-700 rounded mx-auto cursor-pointer"
                     />
+                  ) : (
+                    exemptedInspections.includes(line)
+                      ? <span className="text-emerald-600 font-bold text-base" title="Exempt">✓</span>
+                      : <span className="text-red-400 font-bold text-base" title="Not exempt">✗</span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-center">
                   {editingId === line ? (
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={saveEdit} className="p-1 text-emerald-700 hover:text-emerald-800" title="Save">
-                        <Save className="h-3.5 w-3.5" />
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={saveEdit} className="px-2 py-1 text-xs text-emerald-700 font-medium hover:text-emerald-800 border border-emerald-600 rounded hover:bg-emerald-50">
+                        Save
                       </button>
-                      <button onClick={cancelEdit} className="p-1 text-gray-400 hover:text-gray-600" title="Cancel">
-                        <X className="h-3.5 w-3.5" />
+                      <button onClick={cancelEdit} className="px-2 py-1 text-xs text-gray-500 font-medium hover:text-gray-700 border border-gray-300 rounded hover:bg-gray-50">
+                        Cancel
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => startEdit(line)} className="p-1 text-gray-400 hover:text-emerald-700" title="Edit">
-                      <Edit2 className="h-3.5 w-3.5" />
+                    <button onClick={() => startEdit(line)} className="px-2 py-1 text-xs text-gray-500 font-medium hover:text-emerald-700 border border-gray-200 rounded hover:bg-gray-50">
+                      Edit
                     </button>
                   )}
                 </td>
@@ -579,11 +571,7 @@ const BusinessLinesTab = () => {
         </table>
       </div>
 
-      {/* Legend */}
-      <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
-        <p><span className="inline-block w-3 h-3 bg-emerald-700 rounded mr-1"></span> <strong>Exempt from Requirements</strong> — Business line does not require document submissions</p>
-        <p><span className="inline-block w-3 h-3 bg-amber-600 rounded mr-1"></span> <strong>Exempt from Inspections</strong> — Business line does not require inspections</p>
-      </div>
+
 
       {/* Save button */}
       <div className="flex justify-end pt-4 border-t border-gray-200">
@@ -714,7 +702,7 @@ const SignatoriesTab = () => {
     try {
       const form = new FormData();
       form.append('file', file);
-      form.append('type', type);
+      form.append('sig_type', type);
       form.append('role', role);
       const res = await API.post('/admin/settings/upload-signature', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (type === 'clearance') setClrData(d => ({ ...d, [sigKey]: res.data.url }));
@@ -768,6 +756,10 @@ const SignatoriesTab = () => {
             sigKey="certified_by_signature" data={rptData}
             onFieldChange={(k, v) => handleFieldChange('report', k, v)}
             onSignatureUpload={handleSignatureUpload} uploading={uploadingKey === 'certified_by_signature'} />
+          <SignatoryRow label="Approved By" nameKey="approved_by_name" titleKey="approved_by_title"
+            sigKey="approved_by_signature" data={rptData}
+            onFieldChange={(k, v) => handleFieldChange('report', k, v)}
+            onSignatureUpload={handleSignatureUpload} uploading={uploadingKey === 'approved_by_signature'} />
         </div>
       </div>
       <div className="flex justify-end">
@@ -921,7 +913,7 @@ const ArchiveTab = () => {
                         onClick={() => { setConfirmYear(item.year); setAction('unarchive'); }}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-700 text-emerald-700 text-xs rounded-lg hover:bg-emerald-50 transition-colors"
                       >
-                        <RotateCcw className="h-3.5 w-3.5" />
+                        <ArchiveRestore className="h-3.5 w-3.5" />
                         Restore
                       </button>
                     ) : (
@@ -1214,7 +1206,7 @@ const AdminAccountTab = () => {
               className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50">
               {creating
                 ? <><span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Creating…</>
-                : <><UserCog className="h-3.5 w-3.5" />Create & Transfer</>}
+                : <>Create & Transfer</>}
             </button>
           </div>
         </div>
@@ -1329,7 +1321,7 @@ const AdminSettings = () => {
   const [tab, setTab] = useState('requirements');
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-16">
+    <div className="max-w-6xl space-y-6 pb-16">
       <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
 
       <div className="border-b border-gray-200 -mx-4 sm:mx-0 px-4 sm:px-0">

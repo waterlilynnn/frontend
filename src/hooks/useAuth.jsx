@@ -6,20 +6,26 @@ const AuthContext = createContext(null);
 const decodeJwt = (token) => {
   try {
     const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const base64    = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
-      atob(base64).split('').map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
     );
     return JSON.parse(jsonPayload);
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]         = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Restore session 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token      = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
       try {
@@ -38,6 +44,14 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(false);
   }, []);
 
+  useEffect(() => {
+    const handleForceLogout = () => {
+      setUser(null);
+    };
+    window.addEventListener('auth:logout', handleForceLogout);
+    return () => window.removeEventListener('auth:logout', handleForceLogout);
+  }, []);
+
   const login = async (email, password) => {
     try {
       const tokenRes = await API.post('/login', { email, password });
@@ -46,42 +60,76 @@ export const AuthProvider = ({ children }) => {
       const payload = decodeJwt(access_token);
       if (!payload?.sub) throw new Error('Invalid token');
 
-      let formattedUser;
+      let formattedUser = null;
       try {
-        const usersRes = await API.get('/users', { headers: { Authorization: `Bearer ${access_token}` } });
-        const userData = usersRes.data.find(u => u.id === parseInt(payload.sub));
+        const usersRes = await API.get('/users', {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        const userData = usersRes.data.find(
+          (u) => u.id === parseInt(payload.sub)
+        );
         if (userData) {
-          formattedUser = { id: userData.id, email: userData.email, full_name: userData.full_name, role: userData.role.toLowerCase(), is_active: userData.is_active };
+          formattedUser = {
+            id:        userData.id,
+            email:     userData.email,
+            full_name: userData.full_name,
+            role:      userData.role.toLowerCase(),
+            is_active: userData.is_active,
+          };
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Could not fetch user details, using fallback', err);
+      }
 
       if (!formattedUser) {
-        formattedUser = { id: parseInt(payload.sub), email, full_name: email.split('@')[0], role: (payload.role || 'staff').toLowerCase(), is_active: true };
+        formattedUser = {
+          id:        parseInt(payload.sub),
+          email,
+          full_name: email.split('@')[0],
+          role:      (payload.role || 'staff').toLowerCase(),
+          is_active: true,
+        };
       }
 
       localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(formattedUser));
+      localStorage.setItem('user',  JSON.stringify(formattedUser));
       setUser(formattedUser);
       return { success: true, user: formattedUser };
     } catch (error) {
-      return { success: false, error: error.response?.data?.detail || error.message || 'Login failed' };
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'Login failed',
+      };
     }
   };
 
   const logout = async () => {
     const token = localStorage.getItem('token');
     if (token) {
-      try { await API.post('/users/logout', {}, { headers: { Authorization: `Bearer ${token}` } }); } catch {}
+      try {
+        await API.post(
+          '/users/logout',
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch {
+      }
     }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('needsPasswordChange');
     setUser(null);
-    window.location.href = '/';
+  };
+
+  const updateToken = (newToken) => {
+    if (!newToken) return;
+    localStorage.setItem('token', newToken);
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, setUser, isLoading, login, logout, updateToken }}
+    >
       {children}
     </AuthContext.Provider>
   );

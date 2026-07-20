@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -26,6 +26,54 @@ const EMPTY_FORM = {
 
 const PER_PAGE = 10;
 
+/* ── search helpers ── */
+const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+/*
+ * FIX: order-independent, multi-word matching.
+ * - Strips non-alphanumeric chars (so "129-2012-00" === "129201200").
+ * - Splits the query into words and requires ALL of them to appear
+ *   somewhere in the target, in ANY order.
+ *   e.g. searching "Juan Cruz" now matches owner stored as "Cruz, Juan"
+ *        because norm() turns both into tokens "cruz" and "juan".
+ */
+const hit = (text, q) => {
+  const t = norm(text);
+  const words = norm(q).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  return words.every((w) => t.includes(w));
+};
+
+/*
+ * FIX: highlight matches even when the text contains separators
+ * (dashes, spaces, etc.) that the search query doesn't include.
+ * e.g. searching "129201200" highlights "129-2012-00" entirely.
+ *
+ * Builds a regex where each character of a search word may be
+ * followed by zero or more non-alphanumeric characters.
+ */
+const escapeChar = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const buildFlexPattern = (word) =>
+  word.split('').map(escapeChar).join('[^a-zA-Z0-9]*');
+
+const Highlight = ({ text = '', query = '' }) => {
+  const words = norm(query).split(' ').filter(Boolean);
+  if (words.length === 0 || !text) return <>{String(text)}</>;
+
+  const pattern = words.map(buildFlexPattern).join('|');
+  const parts = String(text).split(new RegExp(`(${pattern})`, 'gi'));
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1
+          ? <mark key={i} className="bg-[#FFFF00] text-black rounded-sm">{part}</mark>
+          : part
+      )}
+    </>
+  );
+};
+
 const BusinessRecords = ({ rolePrefix = 'staff' }) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -34,17 +82,9 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
   const [showForm, setShowForm]       = useState(false);
   const [formData, setFormData]       = useState(EMPTY_FORM);
 
-  const SEARCH_MIN = 1;
-
   const { data: allBusinesses, isLoading, refetch } = useQuery({
-    queryKey: ['businessRecords', searchQuery],
+    queryKey: ['businessRecords'],
     queryFn: async () => {
-      if (searchQuery.length >= SEARCH_MIN) {
-        const res = await API.get(
-          `/business-records/search?q=${encodeURIComponent(searchQuery)}&per_page=1000`
-        );
-        return res.data || [];
-      }
       const res = await API.get('/business-records/all');
       return res.data || [];
     },
@@ -80,7 +120,26 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to create record'),
   });
 
-  const allItems   = allBusinesses || [];
+  const allItems = useMemo(() => {
+    const q = norm(searchQuery);
+    const raw = allBusinesses || [];
+    if (!q) return raw;
+    return raw.filter(b => {
+      /* Combined full-name string for "Last First Middle" queries */
+      const owner = [b.owner_last_name, b.owner_first_name, b.owner_middle_name]
+        .filter(Boolean).join(' ');
+      return (
+        hit(b.establishment_name, q) ||
+        hit(b.owner_last_name,    q) ||
+        hit(b.owner_first_name,   q) ||
+        hit(owner,                q) ||
+        hit(b.bin_number,         q) ||
+        /* FIX: also search owner_name_raw — records imported/created with raw name only */
+        hit(b.owner_name_raw,     q)
+      );
+    });
+  }, [allBusinesses, searchQuery]);
+
   const totalCount = allItems.length;
   const totalPages = Math.ceil(totalCount / PER_PAGE);
 
@@ -107,7 +166,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
       if (business.owner_suffix)      name += ` ${business.owner_suffix}`;
       return name;
     }
-    return business.owner_name || business.owner_name_raw || '—';
+    return business.owner_name_raw || business.owner_name || '—';
   };
 
   const safeOptions = {
@@ -137,13 +196,11 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
           <input
-            type="search"
-            inputMode="search"
-            enterKeyHint="search"
-            placeholder="Search by name, owner, or BIN…"
+            type="text"
+            placeholder="Search by establishment name, owner, or BIN…"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-forest-500 focus:border-forest-500 text-sm"
+            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 text-sm"
           />
           {searchQuery && (
             <button
@@ -155,10 +212,10 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
           )}
         </div>
 
-        {searchQuery.length >= SEARCH_MIN && !isLoading && (
+        {searchQuery && !isLoading && (
           <p className="text-xs text-gray-500">
             <span className="bg-gray-100 px-2 py-0.5 rounded-full font-medium">
-              {totalCount} result{totalCount !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
+              {totalCount} result{totalCount !== 1 ? 's' : ''} for &quot;{searchQuery.trim()}&quot;
             </span>
           </p>
         )}
@@ -171,7 +228,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-bold text-gray-800">New Business Record</h2>
                   <button onClick={() => { setShowForm(false); setFormData(EMPTY_FORM); }}
-                    className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+                    className="text-gray-400 hover:text-gray-600"></button>
                 </div>
                 <BusinessForm
                   mode="create"
@@ -195,7 +252,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
             </div>
           ) : businesses.length === 0 ? (
             <div className="text-center py-12 text-gray-500 text-sm">
-              {searchQuery.length >= SEARCH_MIN ? `No results for "${searchQuery}"` : 'No business records found'}
+              {searchQuery ? `No results for "${searchQuery.trim()}"` : 'No business records found'}
             </div>
           ) : (
             <>
@@ -204,7 +261,7 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      {['Date Applied', 'Business Name', 'Business Line', 'Business Owner', 'Type', 'Action'].map(col => (
+                      {['Date Applied', 'Date Created', 'Business Name', 'Business Line', 'Business Owner', 'Type', 'Action'].map(col => (
                         <th key={col} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{col}</th>
                       ))}
                     </tr>
@@ -213,14 +270,24 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                     {businesses.map((business) => (
                       <tr key={business.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {formatDate(business.application_date || business.created_at)}
+                          {formatDate(business.application_date)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(business.created_at)}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{business.establishment_name}</div>
-                          <div className="text-xs text-gray-500 font-mono mt-0.5">BIN: {business.bin_number || '—'}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            <Highlight text={business.establishment_name} query={searchQuery} />
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono mt-0.5">
+                            BIN: <Highlight text={business.bin_number || ''} query={searchQuery} />
+                            {!business.bin_number && '—'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{business.business_line || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{formatOwnerName(business)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <Highlight text={formatOwnerName(business)} query={searchQuery} />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{business.application_type || 'NEW'}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button onClick={() => navigate(`/${rolePrefix}/business/${business.id}`)}
@@ -240,9 +307,16 @@ const BusinessRecords = ({ rolePrefix = 'staff' }) => {
                   <div key={business.id} className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{business.establishment_name}</p>
-                        <p className="text-xs text-gray-500 font-mono mt-0.5">BIN: {business.bin_number || '—'}</p>
-                        <p className="text-xs text-gray-600 mt-1">{formatOwnerName(business)}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          <Highlight text={business.establishment_name} query={searchQuery} />
+                        </p>
+                        <p className="text-xs text-gray-500 font-mono mt-0.5">
+                          BIN: <Highlight text={business.bin_number || ''} query={searchQuery} />
+                          {!business.bin_number && '—'}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          <Highlight text={formatOwnerName(business)} query={searchQuery} />
+                        </p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <span className="text-xs text-gray-400">{formatDate(business.application_date || business.created_at)}</span>
                           <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">{business.application_type || 'NEW'}</span>

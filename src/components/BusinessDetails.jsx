@@ -112,6 +112,7 @@ const BusinessDetails = ({ backPath = '/staff/business' }) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 pb-24">
+      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <button onClick={() => navigate(backPath)} className="inline-flex items-center text-gray-600 hover:text-gray-900 text-sm">
@@ -150,7 +151,6 @@ const BusinessDetails = ({ backPath = '/staff/business' }) => {
           <>
             <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">{business.establishment_name}</h2>
 
-            {/* Key info grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
               {[
                 { label: 'Control Number',   value: business.control_number || '—', mono: true },

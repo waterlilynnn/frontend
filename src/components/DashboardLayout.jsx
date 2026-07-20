@@ -53,7 +53,7 @@ const GaugeChart = ({ passed, violation, notInspected }) => {
   
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 150, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ position: 'relative', flex: 1, minHeight: 120 }}>
+      <div style={{ position: 'relative', flex: 1, minHeight: 180, marginBottom: -10 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie 
@@ -62,8 +62,8 @@ const GaugeChart = ({ passed, violation, notInspected }) => {
               cy="78%" 
               startAngle={180} 
               endAngle={0} 
-              innerRadius="48%" 
-              outerRadius="80%" 
+              innerRadius="80%" 
+              outerRadius="130%" 
               dataKey="value" 
               paddingAngle={2} 
               cornerRadius={4}
@@ -81,7 +81,7 @@ const GaugeChart = ({ passed, violation, notInspected }) => {
                   return (
                     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px', fontSize: 10 }}>
                       <p style={{ color: '#16a34a', margin: '0 0 2px', fontWeight: 600 }}>✓ Passed: {passed}</p>
-                      <p style={{ color: '#ef4444', margin: 0, fontWeight: 600 }}>⚠ Violation: {violation}</p>
+                      <p style={{ color: '#ef4444', margin: 0, fontWeight: 600 }}>⚠ With Violation: {violation}</p>
                     </div>
                   );
                 }
@@ -94,19 +94,19 @@ const GaugeChart = ({ passed, violation, notInspected }) => {
             />
           </PieChart>
         </ResponsiveContainer>
-        <div style={{ position: 'absolute', bottom: '16%', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
-          <span style={{ fontSize: 22, fontWeight: 700, color: P.primary, lineHeight: 1 }}>{Math.round(inspectedPct)}%</span>
-          <span style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>Inspected</span>
+        <div style={{ position: 'absolute', bottom: '25%', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
+          <span style={{ fontSize: 25, fontWeight: 700, color: P.primary, lineHeight: 1 }}>{Math.round(inspectedPct)}%</span>
+          <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 5 }}>Inspected</span>
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, paddingBottom: 4, flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 30, paddingBottom: 14, flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#6b7280' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: P.primary }} />
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: P.primary }} />
           Inspected ({inspected})
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#6b7280' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#e5e7eb' }} />
-          Not yet ({notInspected})
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#e5e7eb' }} />
+          Not yet inspected ({notInspected})
         </div>
       </div>
     </div>
@@ -119,23 +119,23 @@ const TopBusinessLinesChart = ({ data }) => {
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 150 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={[...data].sort((b, a) => a.value - b.value)} margin={{ top: 5, right: 15, left: 0, bottom: 15 }}>
+        <LineChart data={[...data].sort((b, a) => a.value - b.value)} margin={{ top: 5, right: 15, left: -10, bottom: 17 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="shortName" tick={{ fontSize: 6, fill: '#64748b' }} angle={-25} textAnchor="end" height={35} interval={0} />
-          <YAxis tick={{ fontSize: 7, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <XAxis dataKey="shortName" tick={{ fontSize: 8, fill: '#64748b' }} angle={-25} textAnchor="end" height={30} interval={0} />
+          <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={true} tickLine={true} allowDecimals={false} />
           <Tooltip 
             wrapperStyle={{ zIndex: 9999 }} 
             content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
               return (
-                <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 9 }}>
-                  <p style={{ fontWeight: 600, color: '#374151', margin: '0 0 1px' }}>{payload[0].payload.fullName}</p>
-                  <p style={{ fontWeight: 700, color: '#10b981', margin: 0 }}>{payload[0].value} businesses</p>
+                <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 10 }}>
+                  <p style={{ fontWeight: 400, color: '#374151', margin: '0 0 1px' }}>{payload[0].payload.fullName}</p>
+                  <p style={{ fontWeight: 500, color: '#10b981', margin: 0 }}>{payload[0].value} businesses</p>
                 </div>
               );
             }} 
           />
-          <Line type="monotone" dataKey="value" stroke={P.primary} strokeWidth={2} dot={{ r: 3, fill: P.primary, strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5 }} />
+          <Line type="monotone" dataKey="value" stroke={P.primary} strokeWidth={2} dot={{ r: 3.5, fill: P.primary, strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -157,9 +157,9 @@ const DonutTip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const d = payload[0];
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 9 }}>
-      <p style={{ fontWeight: 600, color: '#374151', margin: '0 0 1px' }}>{d.name}</p>
-      <p style={{ fontWeight: 700, color: d.payload?.fill, margin: 0 }}>{d.value} ({d.payload?.pct}%)</p>
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 10 }}>
+      <p style={{ fontWeight: 400, color: '#374151', margin: '0 0 1px' }}>{d.name}</p>
+      <p style={{ fontWeight: 500, color: d.payload?.fill, margin: 0 }}>{d.value} ({d.payload?.pct}%)</p>
     </div>
   );
 };
@@ -168,7 +168,7 @@ const BarangayXTick = ({ x, y, payload }) => {
   const name = (payload.value || '').replace(/^(BARANGAY |BGY\.? )/i, '');
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={4} textAnchor="end" fill="#64748b" fontSize={7} transform="rotate(-40)">{name}</text>
+      <text x={0} y={0} dy={4} textAnchor="end" fill="#64748b" fontSize={9} transform="rotate(-28)">{name}</text>
     </g>
   );
 };
@@ -276,31 +276,31 @@ const DashboardLayout = ({ role = 'staff' }) => {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="flex flex-col h-56 sm:h-64">
+        <Card className="flex flex-col h-[200px] sm:h-56">
           <ChartTitle title="Top Business Lines" />
-          <div className="flex-1 px-2 pb-1 min-h-0">
+          <div className="flex-1 min-h-0 pt-5">
             <TopBusinessLinesChart data={bizLineData} />
           </div>
         </Card>
 
-        <Card className="flex flex-col h-56 sm:h-64">
+        <Card className="flex flex-col h-[200px] sm:h-56">
           <ChartTitle title="Hauler Distribution" />
           <div className="flex-1 min-h-0">
             {haulerData.length === 0 ? <NoData /> : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={haulerData} cx="50%" cy="50%" innerRadius="25%" outerRadius="62%" paddingAngle={2} dataKey="value" labelLine={false} label={renderCustomLabel}>
+                  <Pie data={haulerData} cx="50%" cy="50%" innerRadius="35%" outerRadius="82%" paddingAngle={2} dataKey="value" labelLine={false} label={renderCustomLabel}>
                     {haulerData.map((entry, i) => <Cell key={i} fill={entry.fill} stroke="white" strokeWidth={1} />)}
                   </Pie>
                   <Tooltip wrapperStyle={{ zIndex: 9999 }} content={<DonutTip />} />
-                  <Legend verticalAlign="bottom" layout="horizontal" iconType="circle" iconSize={5} wrapperStyle={{ fontSize: '7px', paddingTop: '2px' }} formatter={v => <span style={{ fontSize: 7, color: '#64748b' }}>{v}</span>} />
+                  <Legend verticalAlign="bottom" layout="horizontal" iconType="circle" iconSize={7} wrapperStyle={{ fontSize: '9px', paddingBottom: '5px' }} formatter={v => <span style={{ fontSize: 9, color: '#64748b' }}>{v}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             )}
           </div>
         </Card>
 
-        <Card className="flex flex-col h-56 sm:h-64">
+        <Card className="flex flex-col h-[200px] sm:h-56">
           <ChartTitle title="Inspection Status" />
           <div className="flex-1 px-1 pb-1 min-h-0">
             <GaugeChart passed={inspectionStats.passed} violation={inspectionStats.violation} notInspected={inspectionStats.notInspected} />
@@ -309,29 +309,29 @@ const DashboardLayout = ({ role = 'staff' }) => {
       </div>
 
       {/* Barangay bar chart */}
-      <Card className="flex flex-col h-64 sm:h-72">
+      <Card className="flex flex-col h-[264px] sm:h-72">
         <ChartTitle title="Applications per Barangay" />
         <div className="flex-1 px-2 pb-1 min-h-0">
           {barangayData.length === 0 ? <NoData /> : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barangayData} margin={{ top: 6, right: 10, left: -10, bottom: 0 }} barCategoryGap="18%">
+              <BarChart data={barangayData} margin={{ top: 25, right: 10, left: -30, bottom: 0 }} barCategoryGap="18%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" tick={<BarangayXTick />} axisLine={false} tickLine={false} interval={0} height={70} />
-                <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <XAxis dataKey="name" tick={<BarangayXTick />} axisLine={true} tickLine={true} interval={0} height={70} />
+                <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={true} tickLine={true} allowDecimals={false} />
                 <Tooltip 
                   wrapperStyle={{ zIndex: 9999 }} 
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     return (
-                      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 9 }}>
-                        <p style={{ fontWeight: 600, color: '#374151', margin: '0 0 1px' }}>{label}</p>
-                        <p style={{ fontWeight: 700, color: '#10b981', margin: 0 }}>{payload[0]?.value} businesses</p>
+                      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '4px 8px', fontSize: 10 }}>
+                        <p style={{ fontWeight: 400, color: '#374151', margin: '0 0 1px' }}>{label}</p>
+                        <p style={{ fontWeight: 500, color: '#10b981', margin: 0 }}>{payload[0]?.value} businesses</p>
                       </div>
                     );
                   }} 
                   cursor={{ fill: '#f0fdf4' }} 
                 />
-                <Bar dataKey="value" radius={[3, 3, 0, 0]} barSize={16}>
+                <Bar dataKey="value" radius={[3, 3, 0, 0]} barSize={20}>
                   {barangayData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Bar>
               </BarChart>

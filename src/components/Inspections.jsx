@@ -16,6 +16,40 @@ const MONTHS = [
   'July','August','September','October','November','December',
 ];
 
+/* ── FIX: add search helpers to match format of BusinessRecords / Clearance ── */
+const norm = (s) => (s ?? '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+/* FIX: order-independent, multi-word matching (see BusinessRecords.jsx for details) */
+const hit = (text, q) => {
+  const t = norm(text);
+  const words = norm(q).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  return words.every((w) => t.includes(w));
+};
+
+/* FIX: highlight matches across separators (see BusinessRecords.jsx) */
+const escapeChar = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const buildFlexPattern = (word) =>
+  word.split('').map(escapeChar).join('[^a-zA-Z0-9]*');
+
+const Highlight = ({ text = '', query = '' }) => {
+  const words = norm(query).split(' ').filter(Boolean);
+  if (words.length === 0 || !text) return <>{String(text)}</>;
+
+  const pattern = words.map(buildFlexPattern).join('|');
+  const parts = String(text).split(new RegExp(`(${pattern})`, 'gi'));
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1
+          ? <mark key={i} className="bg-[#FFFF00] text-black rounded-sm">{part}</mark>
+          : part
+      )}
+    </>
+  );
+};
+
 const ResultBadge = ({ inspections }) => {
   if (!inspections || inspections.length === 0) return null;
   const latest = inspections[0];
@@ -71,78 +105,73 @@ const HistorySlideOver = ({ business, onClose }) => {
             <X className="h-5 w-5" />
           </button>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin h-6 w-6 border-2 border-emerald-700 border-t-transparent rounded-full" />
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-700" />
             </div>
           ) : inspections.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <Clock className="h-10 w-10 mx-auto mb-3 text-gray-200" />
-              <p className="text-sm">No inspections recorded yet</p>
-            </div>
+            <div className="text-center py-12 text-gray-400 text-sm">No inspection records yet</div>
           ) : (
-            inspections.map(insp => {
-              const isViolation = insp.status === 'WITH VIOLATION';
-              const isResolved  = insp.is_resolved;
-              return (
-                <div key={insp.id} className={`border rounded-xl p-4 ${
-                  isViolation && !isResolved ? 'border-red-200 bg-red-50'
-                  : isResolved             ? 'border-blue-200 bg-blue-50'
+            inspections.map(insp => (
+              <div key={insp.id} className={`border rounded-xl p-4 space-y-2 ${
+                insp.status === 'WITH VIOLATION' && !insp.is_resolved
+                  ? 'border-red-200 bg-red-50'
+                  : insp.is_resolved
+                  ? 'border-blue-200 bg-blue-50'
                   : 'border-green-200 bg-green-50'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                      <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                      {fmtDt(insp.date)}
-                    </div>
-                    {isViolation && !isResolved
-                      ? <span className="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">With Violation</span>
-                      : isResolved
-                      ? <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Resolved</span>
-                      : <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Passed</span>}
+              }`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Calendar className="h-3 w-3" />
+                    {fmtDt(insp.date)}
                   </div>
-                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
-                    <User className="h-3 w-3" /> {insp.inspector || 'Unknown'}
-                  </div>
-                  {insp.remarks && (
-                    <p className="text-sm text-gray-700 mt-2 bg-white/60 rounded p-2">{insp.remarks}</p>
-                  )}
-                  {isResolved && (
-                    <div className="mt-2 text-xs text-blue-700">
-                      <span className="font-medium">Resolved by:</span> {insp.resolved_by} · {fmtDt(insp.resolved_at)}
-                      {insp.resolved_remarks && <p className="mt-0.5">Remark: {insp.resolved_remarks}</p>}
-                    </div>
-                  )}
-                  {isViolation && !isResolved && (
-                    <div className="mt-3">
-                      {resolveId === insp.id ? (
-                        <div className="space-y-2">
-                          <textarea rows={2} placeholder="Resolution remarks (optional)"
-                            value={resolveRemarks} onChange={e => setResolveRemarks(e.target.value)}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm" />
-                          <div className="flex gap-2">
-                            <button onClick={() => { setResolveId(null); setResolveRemarks(''); }}
-                              className="px-3 py-1 border border-gray-300 rounded text-xs text-gray-600">Cancel</button>
-                            <button onClick={() => resolveMutation.mutate({ id: insp.id, remarks: resolveRemarks })}
-                              disabled={resolveMutation.isLoading}
-                              className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50">
-                              Confirm
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button onClick={() => setResolveId(insp.id)}
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                          <ShieldCheck className="h-3 w-3" /> Mark as Resolved
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <ResultBadge inspections={[insp]} />
                 </div>
-              );
-            })
+                {insp.inspector_name && (
+                  <p className="text-xs text-gray-500 flex items-center gap-1"><User className="h-3 w-3" />{insp.inspector_name}</p>
+                )}
+                {insp.remarks && <p className="text-sm text-gray-700">{insp.remarks}</p>}
+                {insp.is_resolved && (
+                  <div className="text-xs text-blue-600 pt-1 border-t border-blue-200">
+                    <p>Resolved by {insp.resolved_by} · {fmtDt(insp.resolved_at)}</p>
+                    {insp.resolved_remarks && <p className="mt-0.5 italic">"{insp.resolved_remarks}"</p>}
+                  </div>
+                )}
+                {insp.status === 'WITH VIOLATION' && !insp.is_resolved && (
+                  resolveId === insp.id ? (
+                    <div className="pt-2 space-y-2">
+                      <textarea
+                        placeholder="Resolution remarks (optional)"
+                        value={resolveRemarks}
+                        onChange={e => setResolveRemarks(e.target.value)}
+                        className="w-full text-sm border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none"
+                        rows={2}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => resolveMutation.mutate({ id: insp.id, remarks: resolveRemarks })}
+                          disabled={resolveMutation.isLoading}
+                          className="px-3 py-1 bg-emerald-700 text-white text-xs rounded-lg hover:bg-emerald-800 disabled:opacity-50"
+                        >
+                          {resolveMutation.isLoading ? 'Saving…' : 'Confirm Resolve'}
+                        </button>
+                        <button onClick={() => { setResolveId(null); setResolveRemarks(''); }} className="px-3 py-1 border border-gray-300 text-xs rounded-lg text-gray-600 hover:bg-gray-50">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setResolveId(insp.id)}
+                      className="text-xs text-emerald-700 hover:underline font-medium"
+                    >
+                      Mark as Resolved
+                    </button>
+                  )
+                )}
+              </div>
+            ))
           )}
         </div>
       </div>
@@ -222,12 +251,13 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
         if (!hasPassed) return false;
       }
 
-      if (search) {
-        const q = search.toLowerCase();
+      /* FIX: use norm()/hit() like BusinessRecords instead of plain .toLowerCase() */
+      if (search.trim()) {
+        const q = norm(search);
         if (
-          !b.establishment_name?.toLowerCase().includes(q) &&
-          !(b.bin_number || '').toLowerCase().includes(q) &&
-          !(b.control_number || '').toLowerCase().includes(q)
+          !hit(b.establishment_name, q) &&
+          !hit(b.bin_number,         q) &&
+          !hit(b.control_number,     q)
         ) return false;
       }
 
@@ -325,25 +355,34 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
               <option value="violation">With Violation</option>
               <option value="passed">Latest: Passed</option>
             </select>
-
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-2 h-4 w-4 text-gray-400" />
-              <input
-                type="search"
-                inputMode="search"
-                placeholder="Search business name or control #…"
-                value={search}
-                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-8 py-1.5 border border-gray-300 rounded-lg text-sm"
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-2 top-2 text-gray-400">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
           </div>
         </div>
+
+        {/* FIX: standalone search bar matching the same format as BusinessRecords / Clearance */}
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search business name or BIN…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+            className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 text-sm"
+          />
+          {search && (
+            <button onClick={() => { setSearch(''); setCurrentPage(1); }} className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* FIX: results count */}
+        {search && !isLoading && (
+          <p className="text-xs text-gray-500">
+            <span className="bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''} for &quot;{search.trim()}&quot;
+            </span>
+          </p>
+        )}
 
         {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -363,7 +402,7 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
                       <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Business</th>
                       <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Hauler</th>
                       <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Latest Result</th>
+                      <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Remarks</th>
                       <th className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -374,17 +413,20 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
                       return (
                         <tr key={b.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-5 py-3">
-                            <div className="text-sm font-medium text-gray-900">{b.establishment_name}</div>
-                            <div className="text-xs text-gray-400 mt-0.5">BIN: {b.bin_number || '—'}</div>
+                            {/* FIX: Highlight matches in establishment name and BIN */}
+                            <div className="text-sm font-medium text-gray-900">
+                              <Highlight text={b.establishment_name} query={search} />
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              BIN: <Highlight text={b.bin_number || '—'} query={search} />
+                            </div>
                           </td>
                           <td className="px-5 py-3 text-sm text-gray-600">{b.hauler_type || '—'}</td>
-                          {/* Status */}
                           <td className="px-5 py-3">
                             {isInspected
                               ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 font-medium"><CheckCircle className="h-3 w-3" />Inspected</span>
                               : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500"><MinusCircle className="h-3 w-3" />Not Yet Inspected</span>}
                           </td>
-                          {/* Latest result — clickable to open history */}
                           <td className="px-5 py-3">
                             <button onClick={() => setHistoryBusiness(b)} className="hover:opacity-70">
                               <ResultBadge inspections={inspections} />
@@ -415,17 +457,19 @@ const Inspections = ({ rolePrefix = 'staff' }) => {
                     <div key={b.id} className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">{b.establishment_name}</p>
-                          <p className="text-xs text-gray-400">BIN: {b.bin_number || '—'} · {b.hauler_type || '—'}</p>
+                          {/* FIX: Highlight in mobile cards too */}
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            <Highlight text={b.establishment_name} query={search} />
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            BIN: <Highlight text={b.bin_number || '—'} query={search} /> · {b.hauler_type || '—'}
+                          </p>
                         </div>
-                        {/* Status badge */}
                         {isInspected
                           ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700 font-medium shrink-0"><CheckCircle className="h-3 w-3" />Inspected</span>
                           : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500 shrink-0"><MinusCircle className="h-3 w-3" />Not Yet</span>}
                       </div>
-
                       <div className="flex items-center justify-between">
-                        {/* Latest result */}
                         <button onClick={() => isInspected && setHistoryBusiness(b)}>
                           <ResultBadge inspections={inspections} />
                         </button>

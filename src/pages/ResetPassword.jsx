@@ -101,16 +101,17 @@ const ResetPassword = () => {
         <div className="w-full max-w-sm mx-4 lg:min-w-[450px] lg:max-w-md">
 
           {/* Floating icon */}
-          <div className="flex justify-center">
-            <div className="relative z-10 mb-[-48px] w-24 h-24 rounded-full bg-[#0a6045] border-4 border-[#edf3f0] shadow-xl flex items-center justify-center">
-              {done
-                ? <CheckCircle className="h-10 w-10 text-white" strokeWidth={1.5} />
-                : <KeyRound    className="h-10 w-10 text-white" strokeWidth={1.5} />
-              }
+          <div className="relative">
+            <div className="flex justify-center mb-[-48px] relative z-20">
+              <div className="w-24 h-24 rounded-full bg-[#0a6045] border-4 border-white shadow-xl flex items-center justify-center">
+                {done
+                  ? <CheckCircle className="h-10 w-10 text-white" strokeWidth={1.5} />
+                  : <KeyRound    className="h-10 w-10 text-white" strokeWidth={1.5} />
+                }
+              </div>
             </div>
-          </div>
 
-          <div className="bg-white rounded-2xl border border-black/[0.07] pt-16 pb-6 px-6 lg:pb-8 lg:px-8 shadow-lg">
+          <div className="bg-white rounded-2xl border border-black/[0.07] pt-16 pb-6 px-6 lg:pb-8 lg:px-8 shadow-lg relative z-10">
 
             {done ? (
               /* SUCCESS STATE */
@@ -234,6 +235,7 @@ const ResetPassword = () => {
               </>
             )}
 
+          </div>
           </div>
         </div>
       </div>

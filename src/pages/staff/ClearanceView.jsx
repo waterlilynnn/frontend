@@ -5,7 +5,7 @@ import API from '../../config/api';
 import PDFViewer from '../../components/PDFViewer';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
-
+ 
 const StaffClearanceView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ const StaffClearanceView = () => {
   const [hasViolation, setHasViolation] = useState(false);
   const [controlNumber, setControlNumber] = useState('');
   const pdfUrlRef = useRef(null);
-
+ 
   const { data: clearanceInfo } = useQuery({
     queryKey: ['clearance', id],
     queryFn: async () => {
@@ -23,17 +23,17 @@ const StaffClearanceView = () => {
       return response.data;
     },
   });
-
+ 
   useEffect(() => {
     if (clearanceInfo) {
       setHasViolation(clearanceInfo.has_violation || false);
       setControlNumber(clearanceInfo.control_number || '');
     }
   }, [clearanceInfo]);
-
+ 
   useEffect(() => {
     let mounted = true;
-
+ 
     const fetchPDF = async () => {
       try {
         setLoading(true);
@@ -52,9 +52,9 @@ const StaffClearanceView = () => {
         if (mounted) setLoading(false);
       }
     };
-
+ 
     if (id) fetchPDF();
-
+ 
     return () => {
       mounted = false;
       if (pdfUrlRef.current) {
@@ -63,7 +63,7 @@ const StaffClearanceView = () => {
       }
     };
   }, [id]); 
-
+ 
   const downloadMutation = useMutation({
     mutationFn: async () => {
       const response = await API.post(`/clearance/print/${id}`, null, {
@@ -90,7 +90,7 @@ const StaffClearanceView = () => {
     },
     onError: () => toast.error('Download failed'),
   });
-
+ 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -98,7 +98,7 @@ const StaffClearanceView = () => {
       </div>
     );
   }
-
+ 
   if (error) {
     return (
       <div className="max-w-5xl mx-auto p-6">
@@ -112,7 +112,7 @@ const StaffClearanceView = () => {
       </div>
     );
   }
-
+ 
   if (hasViolation) {
     return (
       <div className="max-w-5xl mx-auto p-6">
@@ -127,12 +127,13 @@ const StaffClearanceView = () => {
       </div>
     );
   }
-
+ 
   return (
     <div className="h-screen bg-black">
       {pdfUrl && (
         <PDFViewer
           url={pdfUrl}
+          title={controlNumber ? `${controlNumber}` : 'clearance'}
           onClose={() => navigate('/staff/clearance')}
           onDownload={() => downloadMutation.mutate()}
         />
@@ -140,5 +141,5 @@ const StaffClearanceView = () => {
     </div>
   );
 };
-
+ 
 export default StaffClearanceView;

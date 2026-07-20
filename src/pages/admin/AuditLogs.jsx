@@ -17,7 +17,6 @@ const ACTIVITY_CATEGORIES = [
   { value: 'all',        label: 'All Activities',    entity_types: null,                            actions: null },
   { value: 'business',   label: 'Business Records',  entity_types: ['BUSINESS'],                    actions: null },
   { value: 'clearance',  label: 'Clearances',        entity_types: ['CLEARANCE'],                   actions: null },
-  { value: 'report',     label: 'Reports',           entity_types: ['REPORT'],                      actions: null },
   { value: 'archive',    label: 'Archive',           entity_types: ['BUSINESS_RECORD', 'SYSTEM'],   actions: ['ARCHIVE', 'UNARCHIVE', 'MANUAL_ARCHIVE'] },
   { value: 'user',       label: 'User Management',   entity_types: ['USER', 'ADMIN_ACCOUNT'],        actions: null },
   { value: 'settings',   label: 'Settings',          entity_types: ['SETTING', 'REQUIREMENT_TEMPLATE'], actions: null },
